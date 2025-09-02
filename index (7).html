@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GenAI Contributor Retraining Manager</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <div class="container">
+                <h1>GenAI Contributor Retraining Manager</h1>
+                <div class="header-actions">
+                    <button class="btn btn--outline btn--sm" id="exportCsvBtn">
+                        📁 Export CSV
+                    </button>
+                    <button class="btn btn--outline btn--sm" id="themeToggle">
+                        🌓 Toggle Theme
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <nav class="nav-tabs">
+            <div class="container">
+                <button class="tab-btn active" data-tab="active">Active Contributors</button>
+                <button class="tab-btn" data-tab="daily">Daily View</button>
+                <button class="tab-btn" data-tab="archive">Archive</button>
+                <button class="tab-btn" data-tab="statistics">Statistics</button>
+            </div>
+        </nav>
+
+        <main class="main">
+            <div class="container">
+                <!-- Notification Area -->
+                <div id="notification" class="notification hidden"></div>
+
+                <!-- Active Contributors Tab -->
+                <div id="active-tab" class="tab-content active">
+                    <div class="section">
+                        <h2>Add New Contributors</h2>
+                        <div class="add-contributor-container">
+                            <!-- Entry Mode Tabs -->
+                            <div class="entry-mode-tabs">
+                                <button class="entry-tab-btn" data-mode="single">Single Entry</button>
+                                <button class="entry-tab-btn active" data-mode="bulk">Bulk Text</button>
+                                <button class="entry-tab-btn" data-mode="csv">CSV Upload</button>
+                            </div>
+
+                            <!-- Single Entry Mode -->
+                            <div id="single-entry" class="entry-mode hidden">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label" for="contributorEmail">Email</label>
+                                        <input type="email" id="contributorEmail" class="form-control" placeholder="contributor@example.com">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label" for="contributorId">ID</label>
+                                        <input type="text" id="contributorId" class="form-control" placeholder="CB001">
+                                    </div>
+                                    <div class="form-group">
+                                        <button class="btn btn--primary" id="addContributorBtn">Add Contributor</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Bulk Text Entry Mode -->
+                            <div id="bulk-entry" class="entry-mode active">
+                                <div class="bulk-instructions">
+                                    <h4>Bulk Entry Instructions</h4>
+                                    <p>Enter one contributor per line using one of these formats:</p>
+                                    <ul>
+                                        <li><strong>Email and ID:</strong> alice@example.com,CB001</li>
+                                        <li><strong>Email only:</strong> alice@example.com (ID will be auto-generated)</li>
+                                    </ul>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="bulkTextArea">Contributors</label>
+                                    <textarea id="bulkTextArea" class="form-control bulk-textarea" 
+                                              placeholder="alice@example.com,CB001&#10;bob@example.com,CB002&#10;charlie@example.com" 
+                                              rows="8"></textarea>
+                                </div>
+                                <div class="bulk-actions">
+                                    <button class="btn btn--secondary" id="previewBulkBtn">Preview</button>
+                                    <button class="btn btn--primary" id="processBulkBtn">Add All Contributors</button>
+                                </div>
+                                <div id="bulkPreview" class="bulk-preview hidden"></div>
+                            </div>
+
+                            <!-- CSV Upload Mode -->
+                            <div id="csv-entry" class="entry-mode hidden">
+                                <div class="csv-instructions">
+                                    <h4>CSV Upload Instructions</h4>
+                                    <p>Upload a CSV file with the following format:</p>
+                                    <div class="csv-example">
+                                        <strong>Headers:</strong> Email, ID (ID is optional)<br>
+                                        <strong>Example:</strong><br>
+                                        <code>Email,ID<br>alice@example.com,CB001<br>bob@example.com,CB002</code>
+                                    </div>
+                                </div>
+                                <div class="csv-upload-area" id="csvUploadArea">
+                                    <div class="upload-content">
+                                        <div class="upload-icon">📁</div>
+                                        <p>Drag and drop your CSV file here, or <button class="btn btn--outline btn--sm" id="selectFileBtn">Select File</button></p>
+                                        <input type="file" id="csvFileInput" accept=".csv" class="hidden">
+                                    </div>
+                                </div>
+                                <div id="csvPreview" class="csv-preview hidden"></div>
+                                <div class="csv-actions hidden" id="csvActions">
+                                    <button class="btn btn--secondary" id="clearCsvBtn">Clear</button>
+                                    <button class="btn btn--primary" id="processCsvBtn">Add All Contributors</button>
+                                </div>
+                            </div>
+
+                            <!-- Processing Progress -->
+                            <div id="processingProgress" class="processing-progress hidden">
+                                <div class="progress-content">
+                                    <div class="loading-spinner"></div>
+                                    <p>Processing contributors...</p>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" id="progressFill"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Results Summary -->
+                            <div id="bulkResults" class="bulk-results hidden">
+                                <h4>Processing Results</h4>
+                                <div class="results-stats">
+                                    <div class="result-stat success">
+                                        <span class="result-count" id="successCount">0</span>
+                                        <span class="result-label">Added</span>
+                                    </div>
+                                    <div class="result-stat warning">
+                                        <span class="result-count" id="duplicateCount">0</span>
+                                        <span class="result-label">Duplicates</span>
+                                    </div>
+                                    <div class="result-stat error">
+                                        <span class="result-count" id="errorCount">0</span>
+                                        <span class="result-label">Errors</span>
+                                    </div>
+                                </div>
+                                <div id="errorDetails" class="error-details hidden"></div>
+                                <div class="results-actions">
+                                    <button class="btn btn--outline" id="dismissResultsBtn">Dismiss</button>
+                                    <button class="btn btn--secondary hidden" id="retryErrorsBtn">Retry Errors</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <div class="section-header">
+                            <h2>Active Contributors</h2>
+                            <div class="section-actions">
+                                <input type="text" id="searchInput" class="form-control search-input" placeholder="Search by email or ID...">
+                                <select id="statusFilter" class="form-control">
+                                    <option value="">All Statuses</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="assigned">Assigned</option>
+                                    <option value="passed">Passed</option>
+                                    <option value="failed">Failed</option>
+                                </select>
+                                <button class="btn btn--secondary" id="bulkArchiveBtn">Archive Selected</button>
+                            </div>
+                        </div>
+                        
+                        <div class="table-container">
+                            <table class="contributors-table">
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="selectAll"></th>
+                                        <th>Email</th>
+                                        <th>ID</th>
+                                        <th>Status</th>
+                                        <th>Date Added</th>
+                                        <th>Date Assigned</th>
+                                        <th>Date Completed</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="contributorsTableBody">
+                                    <!-- Table rows will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Daily View Tab -->
+                <div id="daily-tab" class="tab-content">
+                    <div class="section">
+                        <h2>Daily View</h2>
+                        <div class="daily-controls">
+                            <div class="form-group">
+                                <label class="form-label" for="dailyDatePicker">Select Date</label>
+                                <input type="date" id="dailyDatePicker" class="form-control">
+                            </div>
+                        </div>
+                        
+                        <div class="daily-stats">
+                            <div class="stat-card">
+                                <div class="stat-value" id="dailyTotalAdded">0</div>
+                                <div class="stat-label">Total Added</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="dailyAssigned">0</div>
+                                <div class="stat-label">Assigned</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="dailyPassed">0</div>
+                                <div class="stat-label">Passed</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="dailyFailed">0</div>
+                                <div class="stat-label">Failed</div>
+                            </div>
+                        </div>
+
+                        <div class="table-container">
+                            <table class="contributors-table">
+                                <thead>
+                                    <tr>
+                                        <th>Email</th>
+                                        <th>ID</th>
+                                        <th>Status</th>
+                                        <th>Date Added</th>
+                                        <th>Date Assigned</th>
+                                        <th>Date Completed</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dailyTableBody">
+                                    <!-- Table rows will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Archive Tab -->
+                <div id="archive-tab" class="tab-content">
+                    <div class="section">
+                        <div class="section-header">
+                            <h2>Archived Contributors</h2>
+                            <div class="section-actions">
+                                <input type="text" id="archiveSearchInput" class="form-control search-input" placeholder="Search archived contributors...">
+                                <select id="archiveStatusFilter" class="form-control">
+                                    <option value="">All Statuses</option>
+                                    <option value="passed">Passed</option>
+                                    <option value="failed">Failed</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="table-container">
+                            <table class="contributors-table">
+                                <thead>
+                                    <tr>
+                                        <th>Email</th>
+                                        <th>ID</th>
+                                        <th>Final Status</th>
+                                        <th>Date Added</th>
+                                        <th>Date Completed</th>
+                                        <th>Date Archived</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="archiveTableBody">
+                                    <!-- Table rows will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Statistics Tab -->
+                <div id="statistics-tab" class="tab-content">
+                    <div class="section">
+                        <div class="section-header">
+                            <h2>Statistics & Insights</h2>
+                            <div class="section-actions">
+                                <input type="date" id="statsStartDate" class="form-control">
+                                <input type="date" id="statsEndDate" class="form-control">
+                                <button class="btn btn--secondary" id="updateStatsBtn">Update Charts</button>
+                            </div>
+                        </div>
+                        
+                        <div class="charts-grid">
+                            <div class="chart-card">
+                                <h3>Daily Contributor Additions</h3>
+                                <div class="chart-container" style="position: relative; height: 300px;">
+                                    <canvas id="dailyAdditionsChart"></canvas>
+                                </div>
+                            </div>
+                            
+                            <div class="chart-card">
+                                <h3>Pass/Fail Rates</h3>
+                                <div class="chart-container" style="position: relative; height: 300px;">
+                                    <canvas id="passFailChart"></canvas>
+                                </div>
+                            </div>
+                            
+                            <div class="chart-card">
+                                <h3>Status Distribution</h3>
+                                <div class="chart-container" style="position: relative; height: 300px;">
+                                    <canvas id="statusDistributionChart"></canvas>
+                                </div>
+                            </div>
+                            
+                            <div class="chart-card">
+                                <h3>Weekly Summary</h3>
+                                <div class="chart-container" style="position: relative; height: 300px;">
+                                    <canvas id="weeklySummaryChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Confirmation Modal -->
+        <div id="confirmModal" class="modal hidden">
+            <div class="modal-content">
+                <h3 id="confirmTitle">Confirm Action</h3>
+                <p id="confirmMessage">Are you sure you want to perform this action?</p>
+                <div class="modal-actions">
+                    <button class="btn btn--outline" id="cancelBtn">Cancel</button>
+                    <button class="btn btn--primary" id="confirmBtn">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
