@@ -206,28 +206,28 @@ function switchMainTab(tabName) {
 }
 
 // Data management functions
-function addContributor(email, id) {
-    // Check for duplicates
-    const existingActive = appState.activeContributors.find(c => 
-        c.email.toLowerCase() === email.toLowerCase() || c.id.toLowerCase() === id.toLowerCase()
+function addContributor(email, status = 'pending') {
+    // Check for duplicates by email only
+    const existingActive = appState.activeContributors.find(c =>
+        c.email.toLowerCase() === email.toLowerCase()
     );
-    const existingArchived = appState.archivedContributors.find(c => 
-        c.email.toLowerCase() === email.toLowerCase() || c.id.toLowerCase() === id.toLowerCase()
+    const existingArchived = appState.archivedContributors.find(c =>
+        c.email.toLowerCase() === email.toLowerCase()
     );
-    
+
     if (existingActive || existingArchived) {
-        return { success: false, error: 'Contributor with this email or ID already exists' };
+        return { success: false, error: 'Contributor with this email already exists' };
     }
-    
+
     const contributor = {
-        id: id || generateId(),
+        id: generateId(),
         email: email,
-        status: 'pending',
+        status: status,
         dateAdded: getCurrentDate(),
-        dateAssigned: null,
-        dateCompleted: null
+        dateAssigned: status !== 'pending' ? getCurrentDate() : null,
+        dateCompleted: (status === 'passed' || status === 'failed') ? getCurrentDate() : null
     };
-    
+
     appState.activeContributors.push(contributor);
     return { success: true, contributor };
 }
@@ -294,48 +294,45 @@ function removeContributor(contributorId) {
 function parseBulkText(text) {
     const lines = text.split('\n').filter(line => line.trim());
     const parsed = [];
-    
+
     lines.forEach((line, index) => {
         const trimmedLine = line.trim();
         if (!trimmedLine) return;
-        
-        const parts = trimmedLine.split(',').map(part => part.trim());
-        const email = parts[0];
-        const id = parts[1] || generateId();
-        
+
+        const email = trimmedLine;
+
         const item = {
             lineNumber: index + 1,
             email: email,
-            id: id,
             valid: false,
             duplicate: false,
             error: null
         };
-        
+
         // Validate email
         if (!validateEmail(email)) {
             item.error = 'Invalid email format';
         } else {
             item.valid = true;
         }
-        
-        // Check for duplicates
-        const existingActive = appState.activeContributors.find(c => 
-            c.email.toLowerCase() === email.toLowerCase() || c.id.toLowerCase() === id.toLowerCase()
+
+        // Check for duplicates by email
+        const existingActive = appState.activeContributors.find(c =>
+            c.email.toLowerCase() === email.toLowerCase()
         );
-        const existingArchived = appState.archivedContributors.find(c => 
-            c.email.toLowerCase() === email.toLowerCase() || c.id.toLowerCase() === id.toLowerCase()
+        const existingArchived = appState.archivedContributors.find(c =>
+            c.email.toLowerCase() === email.toLowerCase()
         );
-        
+
         if (existingActive || existingArchived) {
             item.duplicate = true;
-            item.error = 'Duplicate email or ID';
+            item.error = 'Duplicate email';
             item.valid = false;
         }
-        
+
         parsed.push(item);
     });
-    
+
     return parsed;
 }
 
@@ -371,7 +368,7 @@ function previewBulkEntries() {
         <div class="preview-list">
             ${parsed.map(item => `
                 <div class="preview-item ${item.valid && !item.duplicate ? 'valid' : item.duplicate ? 'duplicate' : 'invalid'}">
-                    <span>${item.email}, ${item.id}</span>
+                    <span>${item.email}</span>
                     <span class="preview-status ${item.valid && !item.duplicate ? 'valid' : item.duplicate ? 'duplicate' : 'invalid'}">
                         ${item.valid && !item.duplicate ? 'Valid' : item.duplicate ? 'Duplicate' : 'Error'}
                     </span>
@@ -397,6 +394,8 @@ async function processBulkEntries() {
     
     const parsed = parseBulkText(text);
     const validEntries = parsed.filter(p => p.valid && !p.duplicate);
+    const statusSelect = document.getElementById('bulkStatusSelect');
+    const selectedStatus = statusSelect ? statusSelect.value : 'assigned';
     
     if (validEntries.length === 0) {
         showNotification('No valid entries to process', 'warning');
@@ -417,8 +416,8 @@ async function processBulkEntries() {
         const entry = validEntries[i];
         const progress = ((i + 1) / validEntries.length) * 100;
         progressFill.style.width = `${progress}%`;
-        
-        const result = addContributor(entry.email, entry.id);
+
+        const result = addContributor(entry.email, selectedStatus);
         if (result.success) {
             successCount++;
         } else {
@@ -475,58 +474,54 @@ function parseCsvText(csvText) {
         showNotification('CSV file must have at least a header row and one data row', 'error');
         return;
     }
-    
+
     const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
     const emailIndex = headers.findIndex(h => h.includes('email'));
-    const idIndex = headers.findIndex(h => h.includes('id'));
-    
+
     if (emailIndex === -1) {
         showNotification('CSV file must have an Email column', 'error');
         return;
     }
-    
+
     const parsed = [];
-    
+
     for (let i = 1; i < lines.length; i++) {
         const parts = lines[i].split(',').map(p => p.trim());
         const email = parts[emailIndex];
-        const id = idIndex !== -1 ? parts[idIndex] : generateId();
-        
         if (!email) continue;
-        
+
         const item = {
             lineNumber: i + 1,
             email: email,
-            id: id,
             valid: false,
             duplicate: false,
             error: null
         };
-        
+
         // Validate email
         if (!validateEmail(email)) {
             item.error = 'Invalid email format';
         } else {
             item.valid = true;
         }
-        
-        // Check for duplicates
-        const existingActive = appState.activeContributors.find(c => 
-            c.email.toLowerCase() === email.toLowerCase() || c.id.toLowerCase() === id.toLowerCase()
+
+        // Check for duplicates by email
+        const existingActive = appState.activeContributors.find(c =>
+            c.email.toLowerCase() === email.toLowerCase()
         );
-        const existingArchived = appState.archivedContributors.find(c => 
-            c.email.toLowerCase() === email.toLowerCase() || c.id.toLowerCase() === id.toLowerCase()
+        const existingArchived = appState.archivedContributors.find(c =>
+            c.email.toLowerCase() === email.toLowerCase()
         );
-        
+
         if (existingActive || existingArchived) {
             item.duplicate = true;
-            item.error = 'Duplicate email or ID';
+            item.error = 'Duplicate email';
             item.valid = false;
         }
-        
+
         parsed.push(item);
     }
-    
+
     showCsvPreview(parsed);
 }
 
@@ -548,7 +543,7 @@ function showCsvPreview(parsed) {
         <div class="preview-list">
             ${parsed.slice(0, 10).map(item => `
                 <div class="preview-item ${item.valid && !item.duplicate ? 'valid' : item.duplicate ? 'duplicate' : 'invalid'}">
-                    <span>${item.email}, ${item.id}</span>
+                    <span>${item.email}</span>
                     <span class="preview-status ${item.valid && !item.duplicate ? 'valid' : item.duplicate ? 'duplicate' : 'invalid'}">
                         ${item.valid && !item.duplicate ? 'Valid' : item.duplicate ? 'Duplicate' : 'Error'}
                     </span>
@@ -596,7 +591,7 @@ async function processCsvEntries() {
         const progress = ((i + 1) / validEntries.length) * 100;
         progressFill.style.width = `${progress}%`;
         
-        const result = addContributor(entry.email, entry.id);
+        const result = addContributor(entry.email);
         if (result.success) {
             successCount++;
         } else {
@@ -685,9 +680,8 @@ function renderActiveContributors(contributors = null) {
     
     // Apply filters
     if (searchTerm) {
-        filteredContributors = filteredContributors.filter(c => 
-            c.email.toLowerCase().includes(searchTerm) || 
-            c.id.toLowerCase().includes(searchTerm)
+        filteredContributors = filteredContributors.filter(c =>
+            c.email.toLowerCase().includes(searchTerm)
         );
     }
     
@@ -698,7 +692,7 @@ function renderActiveContributors(contributors = null) {
     if (filteredContributors.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="8" class="empty-state">
+                <td colspan="6" class="empty-state">
                     <h3>No contributors found</h3>
                     <p>Try adjusting your search criteria or add new contributors.</p>
                 </td>
@@ -711,7 +705,6 @@ function renderActiveContributors(contributors = null) {
         <tr>
             <td><input type="checkbox" class="contributor-checkbox" data-id="${contributor.id}"></td>
             <td>${contributor.email}</td>
-            <td>${contributor.id}</td>
             <td>
                 <select class="status-select" data-id="${contributor.id}">
                     <option value="pending" ${contributor.status === 'pending' ? 'selected' : ''}>Pending</option>
@@ -776,7 +769,7 @@ function renderDailyView() {
     if (dailyContributors.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" class="empty-state">
+                <td colspan="6" class="empty-state">
                     <h3>No activity on ${formatDate(selectedDate)}</h3>
                     <p>No contributors were added, assigned, or completed on this date.</p>
                 </td>
@@ -788,7 +781,6 @@ function renderDailyView() {
     tbody.innerHTML = dailyContributors.map(contributor => `
         <tr>
             <td>${contributor.email}</td>
-            <td>${contributor.id}</td>
             <td><span class="status-badge status-badge--${contributor.status}">${contributor.status}</span></td>
             <td>${formatDate(contributor.dateAdded)}</td>
             <td>${formatDate(contributor.dateAssigned)}</td>
@@ -814,9 +806,8 @@ function renderArchive() {
     
     // Apply filters
     if (searchTerm) {
-        filteredContributors = filteredContributors.filter(c => 
-            c.email.toLowerCase().includes(searchTerm) || 
-            c.id.toLowerCase().includes(searchTerm)
+        filteredContributors = filteredContributors.filter(c =>
+            c.email.toLowerCase().includes(searchTerm)
         );
     }
     
@@ -827,7 +818,7 @@ function renderArchive() {
     if (filteredContributors.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" class="empty-state">
+                <td colspan="6" class="empty-state">
                     <h3>No archived contributors found</h3>
                     <p>Archived contributors will appear here when moved from the active list.</p>
                 </td>
@@ -839,7 +830,6 @@ function renderArchive() {
     tbody.innerHTML = filteredContributors.map(contributor => `
         <tr>
             <td>${contributor.email}</td>
-            <td>${contributor.id}</td>
             <td><span class="status-badge status-badge--${contributor.status}">${contributor.status}</span></td>
             <td>${formatDate(contributor.dateAdded)}</td>
             <td>${formatDate(contributor.dateCompleted)}</td>
@@ -1069,12 +1059,11 @@ function getWeeklySummaryData() {
 // CSV Export function
 function exportToCSV() {
     const data = [...appState.activeContributors, ...appState.archivedContributors];
-    const headers = ['ID', 'Email', 'Status', 'Date Added', 'Date Assigned', 'Date Completed', 'Date Archived'];
+    const headers = ['Email', 'Status', 'Date Added', 'Date Assigned', 'Date Completed', 'Date Archived'];
     
     const csvContent = [
         headers.join(','),
         ...data.map(row => [
-            row.id,
             row.email,
             row.status,
             row.dateAdded || '',
@@ -1176,17 +1165,15 @@ function initApp() {
     if (addContributorBtn) {
         addContributorBtn.addEventListener('click', () => {
             const email = document.getElementById('contributorEmail').value.trim();
-            const id = document.getElementById('contributorId').value.trim();
-            
-            if (!email || !id) {
-                showNotification('Please enter both email and ID', 'error');
+
+            if (!email) {
+                showNotification('Please enter an email', 'error');
                 return;
             }
-            
-            const result = addContributor(email, id);
+
+            const result = addContributor(email);
             if (result.success) {
                 document.getElementById('contributorEmail').value = '';
-                document.getElementById('contributorId').value = '';
                 renderActiveContributors();
                 showNotification('Contributor added successfully!');
             } else {
