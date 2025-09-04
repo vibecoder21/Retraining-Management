@@ -15,30 +15,34 @@ const sampleData = {
             "id": "CB001",
             "email": "alice.smith@example.com",
             "status": "assigned",
+            "result": null,
             "dateAdded": "2025-08-29",
             "dateAssigned": "2025-08-29",
             "dateCompleted": null
         },
         {
-            "id": "CB002", 
+            "id": "CB002",
             "email": "bob.jones@example.com",
-            "status": "passed",
+            "status": "assigned",
+            "result": "passed",
             "dateAdded": "2025-08-28",
             "dateAssigned": "2025-08-28",
             "dateCompleted": "2025-08-29"
         },
         {
             "id": "CB003",
-            "email": "charlie.wilson@example.com", 
-            "status": "failed",
+            "email": "charlie.wilson@example.com",
+            "status": "assigned",
+            "result": "failed",
             "dateAdded": "2025-08-27",
-            "dateAssigned": "2025-08-27", 
+            "dateAssigned": "2025-08-27",
             "dateCompleted": "2025-08-28"
         },
         {
             "id": "CB004",
             "email": "diana.clark@example.com",
             "status": "pending",
+            "result": null,
             "dateAdded": "2025-08-29",
             "dateAssigned": null,
             "dateCompleted": null
@@ -48,7 +52,8 @@ const sampleData = {
         {
             "id": "CB005",
             "email": "archived.user@example.com",
-            "status": "passed",
+            "status": "assigned",
+            "result": "passed",
             "dateAdded": "2025-08-25",
             "dateAssigned": "2025-08-25",
             "dateCompleted": "2025-08-26",
@@ -56,6 +61,31 @@ const sampleData = {
         }
     ]
 };
+
+// Persistence helpers
+function saveState() {
+    const stateToSave = {
+        activeContributors: appState.activeContributors,
+        archivedContributors: appState.archivedContributors
+    };
+    localStorage.setItem('retrainingAppState', JSON.stringify(stateToSave));
+}
+
+function loadState() {
+    const saved = localStorage.getItem('retrainingAppState');
+    if (saved) {
+        try {
+            const parsed = JSON.parse(saved);
+            appState.activeContributors = parsed.activeContributors || [];
+            appState.archivedContributors = parsed.archivedContributors || [];
+            return;
+        } catch (e) {
+            console.error('Failed to parse saved state', e);
+        }
+    }
+    appState.activeContributors = [...sampleData.sampleContributors];
+    appState.archivedContributors = [...sampleData.archivedContributors];
+}
 
 // Utility functions
 function getCurrentDate() {
@@ -207,77 +237,83 @@ function switchMainTab(tabName) {
 
 // Data management functions
 function addContributor(email, status = 'pending') {
-    // Gather all existing contributors with the same email
-    const existing = [...appState.activeContributors, ...appState.archivedContributors]
-        .filter(c => c.email.toLowerCase() === email.toLowerCase());
+    const existing = appState.activeContributors.find(
+        c => c.email.toLowerCase() === email.toLowerCase()
+    );
 
-    // Check for same status
-    if (existing.some(c => c.status === status)) {
-        return { success: false, error: 'Contributor with this email and status already exists' };
-    }
-
-    // Prevent having both passed and failed for the same email
-    const hasPassed = existing.some(c => c.status === 'passed');
-    const hasFailed = existing.some(c => c.status === 'failed');
-    if ((status === 'passed' && hasFailed) || (status === 'failed' && hasPassed)) {
-        return { success: false, error: 'Email cannot have both passed and failed statuses' };
+    // If contributor exists and we're adding a result status, update instead
+    if (existing) {
+        if (status === 'passed' || status === 'failed') {
+            if (existing.result && existing.result !== status) {
+                return { success: false, error: 'Email already has conflicting result status' };
+            }
+            existing.result = status;
+            existing.status = 'assigned';
+            existing.dateCompleted = getCurrentDate();
+            saveState();
+            return { success: true, contributor: existing };
+        }
+        return { success: false, error: 'Contributor with this email already exists' };
     }
 
     const contributor = {
         id: generateId(),
         email: email,
-        status: status,
+        status: (status === 'passed' || status === 'failed') ? 'assigned' : status,
+        result: (status === 'passed' || status === 'failed') ? status : null,
         dateAdded: getCurrentDate(),
         dateAssigned: status !== 'pending' ? getCurrentDate() : null,
         dateCompleted: (status === 'passed' || status === 'failed') ? getCurrentDate() : null
     };
 
     appState.activeContributors.push(contributor);
+    saveState();
     return { success: true, contributor };
 }
 
-function updateContributorStatus(contributorId, newStatus) {
+function updateContributorStatus(contributorId, type, newStatus) {
     const contributor = appState.activeContributors.find(c => c.id === contributorId);
     if (!contributor) return;
 
-    const existing = [...appState.activeContributors, ...appState.archivedContributors]
-        .filter(c => c.email.toLowerCase() === contributor.email.toLowerCase() && c.id !== contributorId);
-
-    // Prevent duplicate or conflicting statuses
-    if (existing.some(c => c.status === newStatus)) {
-        showNotification('Contributor with this email already has this status', 'error');
-        return;
+    if (type === 'assignment') {
+        const oldStatus = contributor.status;
+        contributor.status = newStatus;
+        if (newStatus === 'assigned' && oldStatus === 'pending') {
+            contributor.dateAssigned = getCurrentDate();
+        } else if (newStatus === 'pending') {
+            contributor.dateAssigned = null;
+            contributor.result = null;
+            contributor.dateCompleted = null;
+        }
+        showNotification(`Assignment status updated to ${newStatus}`);
+    } else if (type === 'result') {
+        const oldResult = contributor.result;
+        contributor.result = newStatus || null;
+        if (newStatus === 'passed' || newStatus === 'failed') {
+            if (!contributor.dateAssigned) {
+                contributor.status = 'assigned';
+                contributor.dateAssigned = getCurrentDate();
+            }
+            contributor.dateCompleted = getCurrentDate();
+        } else if (oldResult && !newStatus) {
+            contributor.dateCompleted = null;
+        }
+        showNotification(`Result status updated to ${newStatus || 'none'}`);
     }
-    const hasPassed = existing.some(c => c.status === 'passed');
-    const hasFailed = existing.some(c => c.status === 'failed');
-    if ((newStatus === 'passed' && hasFailed) || (newStatus === 'failed' && hasPassed)) {
-        showNotification('Email cannot have both passed and failed statuses', 'error');
-        return;
-    }
-
-    const oldStatus = contributor.status;
-    contributor.status = newStatus;
-
-    // Update timestamps based on status change
-    if (newStatus === 'assigned' && oldStatus === 'pending') {
-        contributor.dateAssigned = getCurrentDate();
-    } else if ((newStatus === 'passed' || newStatus === 'failed') && oldStatus === 'assigned') {
-        contributor.dateCompleted = getCurrentDate();
-    }
-
-    showNotification(`Contributor status updated to ${newStatus}`);
+    saveState();
 }
 
 function archiveContributor(contributorId) {
     const contributorIndex = appState.activeContributors.findIndex(c => c.id === contributorId);
     if (contributorIndex === -1) return;
-    
+
     const contributor = appState.activeContributors[contributorIndex];
     contributor.dateArchived = getCurrentDate();
-    
+
     appState.archivedContributors.push(contributor);
     appState.activeContributors.splice(contributorIndex, 1);
-    
+
+    saveState();
     showNotification('Contributor archived successfully!');
 }
 
@@ -290,7 +326,7 @@ function restoreContributor(contributorId) {
     
     appState.activeContributors.push(contributor);
     appState.archivedContributors.splice(contributorIndex, 1);
-    
+    saveState();
     showNotification('Contributor restored to active list!');
 }
 
@@ -298,13 +334,15 @@ function removeContributor(contributorId) {
     const activeIndex = appState.activeContributors.findIndex(c => c.id === contributorId);
     if (activeIndex !== -1) {
         appState.activeContributors.splice(activeIndex, 1);
+        saveState();
         showNotification('Contributor removed!');
         return;
     }
-    
+
     const archivedIndex = appState.archivedContributors.findIndex(c => c.id === contributorId);
     if (archivedIndex !== -1) {
         appState.archivedContributors.splice(archivedIndex, 1);
+        saveState();
         showNotification('Contributor removed!');
     }
 }
@@ -335,19 +373,21 @@ function parseBulkText(text, status = 'assigned') {
             item.valid = true;
         }
 
-        // Check for duplicates considering status
         const existing = [...appState.activeContributors, ...appState.archivedContributors]
-            .filter(c => c.email.toLowerCase() === email.toLowerCase());
+            .find(c => c.email.toLowerCase() === email.toLowerCase());
 
-        if (existing.some(c => c.status === status)) {
-            item.duplicate = true;
-            item.error = 'Duplicate email';
-            item.valid = false;
-        } else if ((status === 'passed' && existing.some(c => c.status === 'failed')) ||
-                   (status === 'failed' && existing.some(c => c.status === 'passed'))) {
-            item.duplicate = true;
-            item.error = 'Email already has conflicting status';
-            item.valid = false;
+        if (existing) {
+            if (status === 'passed' || status === 'failed') {
+                if (existing.result && existing.result !== status) {
+                    item.duplicate = true;
+                    item.error = 'Email already has conflicting result';
+                    item.valid = false;
+                }
+            } else {
+                item.duplicate = true;
+                item.error = 'Duplicate email';
+                item.valid = false;
+            }
         }
 
         parsed.push(item);
@@ -529,17 +569,20 @@ function parseCsvText(csvText, status = 'pending') {
 
         // Check for duplicates considering status
         const existing = [...appState.activeContributors, ...appState.archivedContributors]
-            .filter(c => c.email.toLowerCase() === email.toLowerCase());
+            .find(c => c.email.toLowerCase() === email.toLowerCase());
 
-        if (existing.some(c => c.status === status)) {
-            item.duplicate = true;
-            item.error = 'Duplicate email';
-            item.valid = false;
-        } else if ((status === 'passed' && existing.some(c => c.status === 'failed')) ||
-                   (status === 'failed' && existing.some(c => c.status === 'passed'))) {
-            item.duplicate = true;
-            item.error = 'Email already has conflicting status';
-            item.valid = false;
+        if (existing) {
+            if (status === 'passed' || status === 'failed') {
+                if (existing.result && existing.result !== status) {
+                    item.duplicate = true;
+                    item.error = 'Email already has conflicting result';
+                    item.valid = false;
+                }
+            } else {
+                item.duplicate = true;
+                item.error = 'Duplicate email';
+                item.valid = false;
+            }
         }
 
         parsed.push(item);
@@ -695,7 +738,7 @@ function renderActiveContributors(contributors = null) {
     
     const searchInput = document.getElementById('searchInput');
     const statusFilterInput = document.getElementById('statusFilter');
-    
+
     const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
     const statusFilter = statusFilterInput ? statusFilterInput.value : '';
     
@@ -709,13 +752,18 @@ function renderActiveContributors(contributors = null) {
     }
     
     if (statusFilter) {
-        filteredContributors = filteredContributors.filter(c => c.status === statusFilter);
+        filteredContributors = filteredContributors.filter(c => {
+            if (statusFilter === 'passed' || statusFilter === 'failed') {
+                return c.result === statusFilter;
+            }
+            return c.status === statusFilter;
+        });
     }
     
     if (filteredContributors.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" class="empty-state">
+                <td colspan="8" class="empty-state">
                     <h3>No contributors found</h3>
                     <p>Try adjusting your search criteria or add new contributors.</p>
                 </td>
@@ -729,11 +777,16 @@ function renderActiveContributors(contributors = null) {
             <td><input type="checkbox" class="contributor-checkbox" data-id="${contributor.id}"></td>
             <td>${contributor.email}</td>
             <td>
-                <select class="status-select" data-id="${contributor.id}">
+                <select class="assignment-select" data-id="${contributor.id}">
                     <option value="pending" ${contributor.status === 'pending' ? 'selected' : ''}>Pending</option>
                     <option value="assigned" ${contributor.status === 'assigned' ? 'selected' : ''}>Assigned</option>
-                    <option value="passed" ${contributor.status === 'passed' ? 'selected' : ''}>Passed</option>
-                    <option value="failed" ${contributor.status === 'failed' ? 'selected' : ''}>Failed</option>
+                </select>
+            </td>
+            <td>
+                <select class="result-select" data-id="${contributor.id}">
+                    <option value="" ${!contributor.result ? 'selected' : ''}>-</option>
+                    <option value="passed" ${contributor.result === 'passed' ? 'selected' : ''}>Passed</option>
+                    <option value="failed" ${contributor.result === 'failed' ? 'selected' : ''}>Failed</option>
                 </select>
             </td>
             <td>${formatDate(contributor.dateAdded)}</td>
@@ -747,9 +800,15 @@ function renderActiveContributors(contributors = null) {
     `).join('');
     
     // Add event listeners for status changes
-    document.querySelectorAll('.status-select').forEach(select => {
+    document.querySelectorAll('.assignment-select').forEach(select => {
         select.addEventListener('change', (e) => {
-            updateContributorStatus(e.target.dataset.id, e.target.value);
+            updateContributorStatus(e.target.dataset.id, 'assignment', e.target.value);
+            renderActiveContributors();
+        });
+    });
+    document.querySelectorAll('.result-select').forEach(select => {
+        select.addEventListener('change', (e) => {
+            updateContributorStatus(e.target.dataset.id, 'result', e.target.value);
             renderActiveContributors();
         });
     });
@@ -770,8 +829,8 @@ function renderDailyView() {
     const stats = {
         totalAdded: appState.activeContributors.filter(c => c.dateAdded === selectedDate).length,
         assigned: appState.activeContributors.filter(c => c.dateAssigned === selectedDate).length,
-        passed: appState.activeContributors.filter(c => c.dateCompleted === selectedDate && c.status === 'passed').length,
-        failed: appState.activeContributors.filter(c => c.dateCompleted === selectedDate && c.status === 'failed').length
+        passed: appState.activeContributors.filter(c => c.dateCompleted === selectedDate && c.result === 'passed').length,
+        failed: appState.activeContributors.filter(c => c.dateCompleted === selectedDate && c.result === 'failed').length
     };
     
     // Update stat cards
@@ -792,7 +851,7 @@ function renderDailyView() {
     if (dailyContributors.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" class="empty-state">
+                <td colspan="7" class="empty-state">
                     <h3>No activity on ${formatDate(selectedDate)}</h3>
                     <p>No contributors were added, assigned, or completed on this date.</p>
                 </td>
@@ -805,6 +864,7 @@ function renderDailyView() {
         <tr>
             <td>${contributor.email}</td>
             <td><span class="status-badge status-badge--${contributor.status}">${contributor.status}</span></td>
+            <td><span class="status-badge status-badge--${contributor.result || 'pending'}">${contributor.result || '-'}</span></td>
             <td>${formatDate(contributor.dateAdded)}</td>
             <td>${formatDate(contributor.dateAssigned)}</td>
             <td>${formatDate(contributor.dateCompleted)}</td>
@@ -835,7 +895,7 @@ function renderArchive() {
     }
     
     if (statusFilter) {
-        filteredContributors = filteredContributors.filter(c => c.status === statusFilter);
+        filteredContributors = filteredContributors.filter(c => c.result === statusFilter);
     }
     
     if (filteredContributors.length === 0) {
@@ -853,7 +913,7 @@ function renderArchive() {
     tbody.innerHTML = filteredContributors.map(contributor => `
         <tr>
             <td>${contributor.email}</td>
-            <td><span class="status-badge status-badge--${contributor.status}">${contributor.status}</span></td>
+            <td><span class="status-badge status-badge--${contributor.result || 'pending'}">${contributor.result || '-'}</span></td>
             <td>${formatDate(contributor.dateAdded)}</td>
             <td>${formatDate(contributor.dateCompleted)}</td>
             <td>${formatDate(contributor.dateArchived)}</td>
@@ -1041,13 +1101,13 @@ function getPassFailData() {
     }
     
     const passed = last7Days.map(date => {
-        return appState.activeContributors.filter(c => c.dateCompleted === date && c.status === 'passed').length +
-               appState.archivedContributors.filter(c => c.dateCompleted === date && c.status === 'passed').length;
+        return appState.activeContributors.filter(c => c.dateCompleted === date && c.result === 'passed').length +
+               appState.archivedContributors.filter(c => c.dateCompleted === date && c.result === 'passed').length;
     });
-    
+
     const failed = last7Days.map(date => {
-        return appState.activeContributors.filter(c => c.dateCompleted === date && c.status === 'failed').length +
-               appState.archivedContributors.filter(c => c.dateCompleted === date && c.status === 'failed').length;
+        return appState.activeContributors.filter(c => c.dateCompleted === date && c.result === 'failed').length +
+               appState.archivedContributors.filter(c => c.dateCompleted === date && c.result === 'failed').length;
     });
     
     return {
@@ -1061,9 +1121,9 @@ function getStatusDistribution() {
     const all = [...appState.activeContributors, ...appState.archivedContributors];
     return {
         pending: all.filter(c => c.status === 'pending').length,
-        assigned: all.filter(c => c.status === 'assigned').length,
-        passed: all.filter(c => c.status === 'passed').length,
-        failed: all.filter(c => c.status === 'failed').length
+        assigned: all.filter(c => c.status === 'assigned' && !c.result).length,
+        passed: all.filter(c => c.result === 'passed').length,
+        failed: all.filter(c => c.result === 'failed').length
     };
 }
 
@@ -1082,13 +1142,14 @@ function getWeeklySummaryData() {
 // CSV Export function
 function exportToCSV() {
     const data = [...appState.activeContributors, ...appState.archivedContributors];
-    const headers = ['Email', 'Status', 'Date Added', 'Date Assigned', 'Date Completed', 'Date Archived'];
+    const headers = ['Email', 'Assignment Status', 'Result', 'Date Added', 'Date Assigned', 'Date Completed', 'Date Archived'];
     
     const csvContent = [
         headers.join(','),
         ...data.map(row => [
             row.email,
             row.status,
+            row.result || '',
             row.dateAdded || '',
             row.dateAssigned || '',
             row.dateCompleted || '',
@@ -1151,10 +1212,10 @@ function toggleTheme() {
 // Initialize application
 function initApp() {
     console.log('Initializing application...');
-    
-    // Load sample data
-    appState.activeContributors = [...sampleData.sampleContributors];
-    appState.archivedContributors = [...sampleData.archivedContributors];
+
+    // Load saved data or fallback to sample
+    loadState();
+    saveState();
     
     // Set initial date for daily view
     const dailyDatePicker = document.getElementById('dailyDatePicker');
