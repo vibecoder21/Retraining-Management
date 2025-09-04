@@ -769,6 +769,16 @@ select.form-control {
   gap: var(--space-8);
 }
 
+.project-controls {
+  display: flex;
+  gap: var(--space-8);
+  align-items: center;
+}
+
+.project-controls .form-control {
+  width: auto;
+}
+
 .nav-tabs {
   background-color: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
