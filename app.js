@@ -186,11 +186,35 @@ function shareProject() {
     try {
         const encoded = encodeURIComponent(btoa(JSON.stringify(data)));
         const url = `${window.location.origin}${window.location.pathname}?shared=${encoded}`;
-        navigator.clipboard.writeText(url).then(() => {
-            showNotification('Share link copied to clipboard');
-        }).catch(() => {
-            showNotification('Failed to copy share link', 'error');
-        });
+
+        if (navigator.share) {
+            navigator.share({ title: data.name, url })
+                .then(() => showNotification('Share dialog opened'))
+                .catch(() => {
+                    // User cancelled or share failed – fall back to clipboard
+                    if (navigator.clipboard && window.isSecureContext) {
+                        navigator.clipboard.writeText(url)
+                            .then(() => showNotification('Share link copied to clipboard'))
+                            .catch(() => {
+                                prompt('Copy this share link:', url);
+                                showNotification('Copy the link manually');
+                            });
+                    } else {
+                        prompt('Copy this share link:', url);
+                        showNotification('Copy the link manually');
+                    }
+                });
+        } else if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(url)
+                .then(() => showNotification('Share link copied to clipboard'))
+                .catch(() => {
+                    prompt('Copy this share link:', url);
+                    showNotification('Copy the link manually');
+                });
+        } else {
+            prompt('Copy this share link:', url);
+            showNotification('Copy the link manually');
+        }
     } catch (err) {
         console.error('Error sharing project:', err);
         showNotification('Failed to generate share link', 'error');
