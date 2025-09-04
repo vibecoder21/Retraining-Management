@@ -57,10 +57,6 @@
                                         <input type="email" id="contributorEmail" class="form-control" placeholder="contributor@example.com">
                                     </div>
                                     <div class="form-group">
-                                        <label class="form-label" for="contributorId">ID</label>
-                                        <input type="text" id="contributorId" class="form-control" placeholder="CB001">
-                                    </div>
-                                    <div class="form-group">
                                         <button class="btn btn--primary" id="addContributorBtn">Add Contributor</button>
                                     </div>
                                 </div>
@@ -70,17 +66,21 @@
                             <div id="bulk-entry" class="entry-mode active">
                                 <div class="bulk-instructions">
                                     <h4>Bulk Entry Instructions</h4>
-                                    <p>Enter one contributor per line using one of these formats:</p>
-                                    <ul>
-                                        <li><strong>Email and ID:</strong> alice@example.com,CB001</li>
-                                        <li><strong>Email only:</strong> alice@example.com (ID will be auto-generated)</li>
-                                    </ul>
+                                    <p>Enter one email per line. All emails will be added with the selected status.</p>
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label" for="bulkTextArea">Contributors</label>
-                                    <textarea id="bulkTextArea" class="form-control bulk-textarea" 
-                                              placeholder="alice@example.com,CB001&#10;bob@example.com,CB002&#10;charlie@example.com" 
+                                    <textarea id="bulkTextArea" class="form-control bulk-textarea"
+                                              placeholder="alice@example.com&#10;bob@example.com&#10;charlie@example.com"
                                               rows="8"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="bulkStatusSelect">Initial Status</label>
+                                    <select id="bulkStatusSelect" class="form-control">
+                                        <option value="assigned">Assigned</option>
+                                        <option value="passed">Passed</option>
+                                        <option value="failed">Failed</option>
+                                    </select>
                                 </div>
                                 <div class="bulk-actions">
                                     <button class="btn btn--secondary" id="previewBulkBtn">Preview</button>
@@ -95,9 +95,9 @@
                                     <h4>CSV Upload Instructions</h4>
                                     <p>Upload a CSV file with the following format:</p>
                                     <div class="csv-example">
-                                        <strong>Headers:</strong> Email, ID (ID is optional)<br>
+                                        <strong>Headers:</strong> Email<br>
                                         <strong>Example:</strong><br>
-                                        <code>Email,ID<br>alice@example.com,CB001<br>bob@example.com,CB002</code>
+                                        <code>Email<br>alice@example.com<br>bob@example.com</code>
                                     </div>
                                 </div>
                                 <div class="csv-upload-area" id="csvUploadArea">
@@ -155,7 +155,7 @@
                         <div class="section-header">
                             <h2>Active Contributors</h2>
                             <div class="section-actions">
-                                <input type="text" id="searchInput" class="form-control search-input" placeholder="Search by email or ID...">
+                                <input type="text" id="searchInput" class="form-control search-input" placeholder="Search by email...">
                                 <select id="statusFilter" class="form-control">
                                     <option value="">All Statuses</option>
                                     <option value="pending">Pending</option>
@@ -173,7 +173,6 @@
                                     <tr>
                                         <th><input type="checkbox" id="selectAll"></th>
                                         <th>Email</th>
-                                        <th>ID</th>
                                         <th>Status</th>
                                         <th>Date Added</th>
                                         <th>Date Assigned</th>
@@ -224,7 +223,6 @@
                                 <thead>
                                     <tr>
                                         <th>Email</th>
-                                        <th>ID</th>
                                         <th>Status</th>
                                         <th>Date Added</th>
                                         <th>Date Assigned</th>
@@ -260,7 +258,6 @@
                                 <thead>
                                     <tr>
                                         <th>Email</th>
-                                        <th>ID</th>
                                         <th>Final Status</th>
                                         <th>Date Added</th>
                                         <th>Date Completed</th>
