@@ -1292,13 +1292,6 @@ function bulkArchive() {
     );
 }
 
-function toggleTheme() {
-    const currentTheme = document.documentElement.getAttribute('data-color-scheme');
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-color-scheme', newTheme);
-    showNotification(`Switched to ${newTheme} theme`);
-}
-
 // Initialize application
 function initApp() {
     console.log('Initializing application...');
@@ -1486,14 +1479,10 @@ function initApp() {
     
     // Other actions
     const exportCsvBtn = document.getElementById('exportCsvBtn');
-    const themeToggle = document.getElementById('themeToggle');
     const updateStatsBtn = document.getElementById('updateStatsBtn');
     
     if (exportCsvBtn) {
         exportCsvBtn.addEventListener('click', exportToCSV);
-    }
-    if (themeToggle) {
-        themeToggle.addEventListener('click', toggleTheme);
     }
     if (updateStatsBtn) {
         updateStatsBtn.addEventListener('click', renderCharts);
