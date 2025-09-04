@@ -178,17 +178,12 @@ function handleImportProject(e) {
 }
 
 function encodeProjectData(data) {
-    const json = JSON.stringify(data);
-    const bytes = new TextEncoder().encode(json);
-    let binary = '';
-    bytes.forEach(b => binary += String.fromCharCode(b));
-    return btoa(binary);
+    // Compress and URI-encode the project JSON for shorter links
+    return LZString.compressToEncodedURIComponent(JSON.stringify(data));
 }
 
 function decodeProjectData(str) {
-    const binary = atob(str);
-    const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
-    const json = new TextDecoder().decode(bytes);
+    const json = LZString.decompressFromEncodedURIComponent(str);
     return JSON.parse(json);
 }
 
@@ -199,8 +194,9 @@ function shareProject() {
         archivedContributors: appState.archivedContributors
     };
     try {
-        const encoded = encodeURIComponent(encodeProjectData(data));
-        const url = `${window.location.origin}${window.location.pathname}?shared=${encoded}`;
+        const encoded = encodeProjectData(data);
+        const baseUrl = window.location.href.split(/[?#]/)[0];
+        const url = `${baseUrl}#shared=${encoded}`;
 
         if (navigator.share) {
             navigator.share({ title: data.name, url })
@@ -253,6 +249,7 @@ function deleteProject() {
             appState.currentProject = appState.projectList[0];
             loadState();
             saveProjectsMeta();
+            saveState();
             renderProjectOptions();
             renderActiveContributors();
             renderArchive();
@@ -1384,8 +1381,13 @@ function initApp() {
     // Load project metadata and handle shared projects
     loadProjectsMeta();
 
-    const params = new URLSearchParams(window.location.search);
-    const shared = params.get('shared');
+    let shared = null;
+    if (window.location.hash.startsWith('#shared=')) {
+        shared = window.location.hash.slice(8);
+    } else {
+        const params = new URLSearchParams(window.location.search);
+        shared = params.get('shared');
+    }
     if (shared) {
         try {
             const data = decodeProjectData(shared);
@@ -1403,6 +1405,7 @@ function initApp() {
             saveState();
             saveProjectsMeta();
             history.replaceState(null, '', window.location.pathname);
+            window.location.hash = '';
         } catch (err) {
             console.error('Failed to load shared project', err);
             showNotification('Invalid shared project link', 'error');
