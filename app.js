@@ -5,7 +5,9 @@ let appState = {
     currentTab: 'active',
     currentEntryMode: 'bulk',
     charts: {},
-    bulkErrors: []
+    bulkErrors: [],
+    projectList: [],
+    currentProject: 'Default'
 };
 
 // Initialize with sample data
@@ -63,16 +65,21 @@ const sampleData = {
 };
 
 // Persistence helpers
+function getProjectKey(project) {
+    return `retrainingAppState_${project}`;
+}
+
 function saveState() {
     const stateToSave = {
         activeContributors: appState.activeContributors,
         archivedContributors: appState.archivedContributors
     };
-    localStorage.setItem('retrainingAppState', JSON.stringify(stateToSave));
+    localStorage.setItem(getProjectKey(appState.currentProject), JSON.stringify(stateToSave));
+    saveProjectsMeta();
 }
 
 function loadState() {
-    const saved = localStorage.getItem('retrainingAppState');
+    const saved = localStorage.getItem(getProjectKey(appState.currentProject));
     if (saved) {
         try {
             const parsed = JSON.parse(saved);
@@ -85,6 +92,89 @@ function loadState() {
     }
     appState.activeContributors = [...sampleData.sampleContributors];
     appState.archivedContributors = [...sampleData.archivedContributors];
+    saveState();
+}
+
+function saveProjectsMeta() {
+    localStorage.setItem('retrainingProjects', JSON.stringify(appState.projectList));
+    localStorage.setItem('retrainingCurrentProject', appState.currentProject);
+}
+
+function loadProjectsMeta() {
+    const list = localStorage.getItem('retrainingProjects');
+    if (list) {
+        try {
+            appState.projectList = JSON.parse(list);
+        } catch (e) {
+            appState.projectList = ['Default'];
+        }
+    } else {
+        appState.projectList = ['Default'];
+    }
+    const current = localStorage.getItem('retrainingCurrentProject');
+    if (current && appState.projectList.includes(current)) {
+        appState.currentProject = current;
+    } else {
+        appState.currentProject = appState.projectList[0];
+    }
+}
+
+function renderProjectOptions() {
+    const select = document.getElementById('projectSelect');
+    if (!select) return;
+    select.innerHTML = '';
+    appState.projectList.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        if (name === appState.currentProject) opt.selected = true;
+        select.appendChild(opt);
+    });
+}
+
+function exportProject() {
+    const data = {
+        name: appState.currentProject,
+        activeContributors: appState.activeContributors,
+        archivedContributors: appState.archivedContributors
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${appState.currentProject}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function handleImportProject(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+        try {
+            const data = JSON.parse(evt.target.result);
+            let name = data.name || file.name.replace(/\.json$/i, '');
+            if (appState.projectList.includes(name)) {
+                name = prompt('Project exists. Enter new name:', name);
+                if (!name) return;
+            }
+            appState.projectList.push(name);
+            appState.currentProject = name;
+            appState.activeContributors = data.activeContributors || [];
+            appState.archivedContributors = data.archivedContributors || [];
+            saveState();
+            renderProjectOptions();
+            renderActiveContributors();
+            renderArchive();
+            renderCharts();
+            showNotification('Project imported successfully');
+        } catch (err) {
+            console.error(err);
+            showNotification('Failed to import project', 'error');
+        }
+    };
+    reader.readAsText(file);
 }
 
 // Utility functions
@@ -1213,10 +1303,11 @@ function toggleTheme() {
 function initApp() {
     console.log('Initializing application...');
 
-    // Load saved data or fallback to sample
+    // Load project metadata and current project state
+    loadProjectsMeta();
+    renderProjectOptions();
     loadState();
-    saveState();
-    
+
     // Set initial date for daily view
     const dailyDatePicker = document.getElementById('dailyDatePicker');
     if (dailyDatePicker) {
@@ -1407,6 +1498,52 @@ function initApp() {
     if (updateStatsBtn) {
         updateStatsBtn.addEventListener('click', renderCharts);
     }
+
+    // Project controls
+    const projectSelect = document.getElementById('projectSelect');
+    const addProjectBtn = document.getElementById('addProjectBtn');
+    const exportProjectBtn = document.getElementById('exportProjectBtn');
+    const importProjectBtn = document.getElementById('importProjectBtn');
+    const importProjectFile = document.getElementById('importProjectFile');
+
+    if (projectSelect) {
+        projectSelect.addEventListener('change', (e) => {
+            saveState();
+            appState.currentProject = e.target.value;
+            loadState();
+            saveProjectsMeta();
+            renderActiveContributors();
+            renderArchive();
+            renderCharts();
+        });
+    }
+
+    if (addProjectBtn) {
+        addProjectBtn.addEventListener('click', () => {
+            const name = prompt('Enter new project name:');
+            if (!name) return;
+            if (!appState.projectList.includes(name)) {
+                appState.projectList.push(name);
+            }
+            appState.currentProject = name;
+            appState.activeContributors = [];
+            appState.archivedContributors = [];
+            saveState();
+            renderProjectOptions();
+            renderActiveContributors();
+            renderArchive();
+            renderCharts();
+        });
+    }
+
+    if (exportProjectBtn) {
+        exportProjectBtn.addEventListener('click', exportProject);
+    }
+
+    if (importProjectBtn && importProjectFile) {
+        importProjectBtn.addEventListener('click', () => importProjectFile.click());
+        importProjectFile.addEventListener('change', handleImportProject);
+    }
     
     // Modal event listeners
     const cancelBtn = document.getElementById('cancelBtn');
@@ -1429,6 +1566,8 @@ function initApp() {
     setTimeout(() => {
         switchEntryMode('bulk');
         renderActiveContributors();
+        renderArchive();
+        renderCharts();
         console.log('Application initialized successfully');
     }, 100);
 }

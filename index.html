@@ -13,6 +13,13 @@
             <div class="container">
                 <h1>GenAI Contributor Retraining Manager</h1>
                 <div class="header-actions">
+                    <div class="project-controls">
+                        <select id="projectSelect" class="form-control"></select>
+                        <button class="btn btn--outline btn--sm" id="addProjectBtn">➕ New</button>
+                        <button class="btn btn--outline btn--sm" id="exportProjectBtn">📤 Export</button>
+                        <button class="btn btn--outline btn--sm" id="importProjectBtn">📥 Import</button>
+                        <input type="file" id="importProjectFile" accept=".json" class="hidden">
+                    </div>
                     <button class="btn btn--outline btn--sm" id="exportCsvBtn">
                         📁 Export CSV
                     </button>
