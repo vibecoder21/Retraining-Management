@@ -177,6 +177,26 @@ function handleImportProject(e) {
     reader.readAsText(file);
 }
 
+function shareProject() {
+    const data = {
+        name: appState.currentProject,
+        activeContributors: appState.activeContributors,
+        archivedContributors: appState.archivedContributors
+    };
+    try {
+        const encoded = encodeURIComponent(btoa(JSON.stringify(data)));
+        const url = `${window.location.origin}${window.location.pathname}?shared=${encoded}`;
+        navigator.clipboard.writeText(url).then(() => {
+            showNotification('Share link copied to clipboard');
+        }).catch(() => {
+            showNotification('Failed to copy share link', 'error');
+        });
+    } catch (err) {
+        console.error('Error sharing project:', err);
+        showNotification('Failed to generate share link', 'error');
+    }
+}
+
 // Utility functions
 function getCurrentDate() {
     return new Date().toISOString().split('T')[0];
@@ -1296,10 +1316,38 @@ function bulkArchive() {
 function initApp() {
     console.log('Initializing application...');
 
-    // Load project metadata and current project state
+    // Load project metadata and handle shared projects
     loadProjectsMeta();
+
+    const params = new URLSearchParams(window.location.search);
+    const shared = params.get('shared');
+    if (shared) {
+        try {
+            const data = JSON.parse(atob(decodeURIComponent(shared)));
+            let name = data.name || 'Shared Project';
+            if (appState.projectList.includes(name)) {
+                let suffix = 1;
+                const base = name;
+                while (appState.projectList.includes(`${base} (${suffix})`)) suffix++;
+                name = `${base} (${suffix})`;
+            }
+            appState.projectList.push(name);
+            appState.currentProject = name;
+            appState.activeContributors = data.activeContributors || [];
+            appState.archivedContributors = data.archivedContributors || [];
+            saveState();
+            saveProjectsMeta();
+            history.replaceState(null, '', window.location.pathname);
+        } catch (err) {
+            console.error('Failed to load shared project', err);
+            showNotification('Invalid shared project link', 'error');
+            loadState();
+        }
+    } else {
+        loadState();
+    }
+
     renderProjectOptions();
-    loadState();
 
     // Set initial date for daily view
     const dailyDatePicker = document.getElementById('dailyDatePicker');
@@ -1493,6 +1541,7 @@ function initApp() {
     const addProjectBtn = document.getElementById('addProjectBtn');
     const exportProjectBtn = document.getElementById('exportProjectBtn');
     const importProjectBtn = document.getElementById('importProjectBtn');
+    const shareProjectBtn = document.getElementById('shareProjectBtn');
     const importProjectFile = document.getElementById('importProjectFile');
 
     if (projectSelect) {
@@ -1527,6 +1576,10 @@ function initApp() {
 
     if (exportProjectBtn) {
         exportProjectBtn.addEventListener('click', exportProject);
+    }
+
+    if (shareProjectBtn) {
+        shareProjectBtn.addEventListener('click', shareProject);
     }
 
     if (importProjectBtn && importProjectFile) {
