@@ -177,6 +177,21 @@ function handleImportProject(e) {
     reader.readAsText(file);
 }
 
+function encodeProjectData(data) {
+    const json = JSON.stringify(data);
+    const bytes = new TextEncoder().encode(json);
+    let binary = '';
+    bytes.forEach(b => binary += String.fromCharCode(b));
+    return btoa(binary);
+}
+
+function decodeProjectData(str) {
+    const binary = atob(str);
+    const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+    const json = new TextDecoder().decode(bytes);
+    return JSON.parse(json);
+}
+
 function shareProject() {
     const data = {
         name: appState.currentProject,
@@ -184,7 +199,7 @@ function shareProject() {
         archivedContributors: appState.archivedContributors
     };
     try {
-        const encoded = encodeURIComponent(btoa(JSON.stringify(data)));
+        const encoded = encodeURIComponent(encodeProjectData(data));
         const url = `${window.location.origin}${window.location.pathname}?shared=${encoded}`;
 
         if (navigator.share) {
@@ -219,6 +234,32 @@ function shareProject() {
         console.error('Error sharing project:', err);
         showNotification('Failed to generate share link', 'error');
     }
+}
+
+function deleteProject() {
+    if (appState.projectList.length <= 1) {
+        showNotification('Cannot delete the last project', 'error');
+        return;
+    }
+    showConfirmDialog(
+        'Delete Project',
+        `Are you sure you want to delete project "${appState.currentProject}"?`,
+        () => {
+            localStorage.removeItem(getProjectKey(appState.currentProject));
+            const idx = appState.projectList.indexOf(appState.currentProject);
+            if (idx !== -1) {
+                appState.projectList.splice(idx, 1);
+            }
+            appState.currentProject = appState.projectList[0];
+            loadState();
+            saveProjectsMeta();
+            renderProjectOptions();
+            renderActiveContributors();
+            renderArchive();
+            renderCharts();
+            showNotification('Project deleted');
+        }
+    );
 }
 
 // Utility functions
@@ -1347,7 +1388,7 @@ function initApp() {
     const shared = params.get('shared');
     if (shared) {
         try {
-            const data = JSON.parse(atob(decodeURIComponent(shared)));
+            const data = decodeProjectData(shared);
             let name = data.name || 'Shared Project';
             if (appState.projectList.includes(name)) {
                 let suffix = 1;
@@ -1566,6 +1607,7 @@ function initApp() {
     const exportProjectBtn = document.getElementById('exportProjectBtn');
     const importProjectBtn = document.getElementById('importProjectBtn');
     const shareProjectBtn = document.getElementById('shareProjectBtn');
+    const deleteProjectBtn = document.getElementById('deleteProjectBtn');
     const importProjectFile = document.getElementById('importProjectFile');
 
     if (projectSelect) {
@@ -1604,6 +1646,10 @@ function initApp() {
 
     if (shareProjectBtn) {
         shareProjectBtn.addEventListener('click', shareProject);
+    }
+
+    if (deleteProjectBtn) {
+        deleteProjectBtn.addEventListener('click', deleteProject);
     }
 
     if (importProjectBtn && importProjectFile) {
