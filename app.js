@@ -207,16 +207,20 @@ function switchMainTab(tabName) {
 
 // Data management functions
 function addContributor(email, status = 'pending') {
-    // Check for duplicates by email only
-    const existingActive = appState.activeContributors.find(c =>
-        c.email.toLowerCase() === email.toLowerCase()
-    );
-    const existingArchived = appState.archivedContributors.find(c =>
-        c.email.toLowerCase() === email.toLowerCase()
-    );
+    // Gather all existing contributors with the same email
+    const existing = [...appState.activeContributors, ...appState.archivedContributors]
+        .filter(c => c.email.toLowerCase() === email.toLowerCase());
 
-    if (existingActive || existingArchived) {
-        return { success: false, error: 'Contributor with this email already exists' };
+    // Check for same status
+    if (existing.some(c => c.status === status)) {
+        return { success: false, error: 'Contributor with this email and status already exists' };
+    }
+
+    // Prevent having both passed and failed for the same email
+    const hasPassed = existing.some(c => c.status === 'passed');
+    const hasFailed = existing.some(c => c.status === 'failed');
+    if ((status === 'passed' && hasFailed) || (status === 'failed' && hasPassed)) {
+        return { success: false, error: 'Email cannot have both passed and failed statuses' };
     }
 
     const contributor = {
@@ -235,17 +239,32 @@ function addContributor(email, status = 'pending') {
 function updateContributorStatus(contributorId, newStatus) {
     const contributor = appState.activeContributors.find(c => c.id === contributorId);
     if (!contributor) return;
-    
+
+    const existing = [...appState.activeContributors, ...appState.archivedContributors]
+        .filter(c => c.email.toLowerCase() === contributor.email.toLowerCase() && c.id !== contributorId);
+
+    // Prevent duplicate or conflicting statuses
+    if (existing.some(c => c.status === newStatus)) {
+        showNotification('Contributor with this email already has this status', 'error');
+        return;
+    }
+    const hasPassed = existing.some(c => c.status === 'passed');
+    const hasFailed = existing.some(c => c.status === 'failed');
+    if ((newStatus === 'passed' && hasFailed) || (newStatus === 'failed' && hasPassed)) {
+        showNotification('Email cannot have both passed and failed statuses', 'error');
+        return;
+    }
+
     const oldStatus = contributor.status;
     contributor.status = newStatus;
-    
+
     // Update timestamps based on status change
     if (newStatus === 'assigned' && oldStatus === 'pending') {
         contributor.dateAssigned = getCurrentDate();
     } else if ((newStatus === 'passed' || newStatus === 'failed') && oldStatus === 'assigned') {
         contributor.dateCompleted = getCurrentDate();
     }
-    
+
     showNotification(`Contributor status updated to ${newStatus}`);
 }
 
@@ -291,7 +310,7 @@ function removeContributor(contributorId) {
 }
 
 // Bulk entry functions
-function parseBulkText(text) {
+function parseBulkText(text, status = 'assigned') {
     const lines = text.split('\n').filter(line => line.trim());
     const parsed = [];
 
@@ -316,17 +335,18 @@ function parseBulkText(text) {
             item.valid = true;
         }
 
-        // Check for duplicates by email
-        const existingActive = appState.activeContributors.find(c =>
-            c.email.toLowerCase() === email.toLowerCase()
-        );
-        const existingArchived = appState.archivedContributors.find(c =>
-            c.email.toLowerCase() === email.toLowerCase()
-        );
+        // Check for duplicates considering status
+        const existing = [...appState.activeContributors, ...appState.archivedContributors]
+            .filter(c => c.email.toLowerCase() === email.toLowerCase());
 
-        if (existingActive || existingArchived) {
+        if (existing.some(c => c.status === status)) {
             item.duplicate = true;
             item.error = 'Duplicate email';
+            item.valid = false;
+        } else if ((status === 'passed' && existing.some(c => c.status === 'failed')) ||
+                   (status === 'failed' && existing.some(c => c.status === 'passed'))) {
+            item.duplicate = true;
+            item.error = 'Email already has conflicting status';
             item.valid = false;
         }
 
@@ -340,13 +360,15 @@ function previewBulkEntries() {
     console.log('Preview bulk entries called');
     const textArea = document.getElementById('bulkTextArea');
     const text = textArea.value.trim();
-    
+
     if (!text) {
         showNotification('Please enter some contributors first', 'warning');
         return;
     }
-    
-    const parsed = parseBulkText(text);
+
+    const statusSelect = document.getElementById('bulkStatusSelect');
+    const selectedStatus = statusSelect ? statusSelect.value : 'assigned';
+    const parsed = parseBulkText(text, selectedStatus);
     const previewEl = document.getElementById('bulkPreview');
     
     if (!previewEl) {
@@ -392,10 +414,10 @@ async function processBulkEntries() {
         return;
     }
     
-    const parsed = parseBulkText(text);
-    const validEntries = parsed.filter(p => p.valid && !p.duplicate);
     const statusSelect = document.getElementById('bulkStatusSelect');
     const selectedStatus = statusSelect ? statusSelect.value : 'assigned';
+    const parsed = parseBulkText(text, selectedStatus);
+    const validEntries = parsed.filter(p => p.valid && !p.duplicate);
     
     if (validEntries.length === 0) {
         showNotification('No valid entries to process', 'warning');
@@ -468,7 +490,7 @@ function handleCsvFile(file) {
     reader.readAsText(file);
 }
 
-function parseCsvText(csvText) {
+function parseCsvText(csvText, status = 'pending') {
     const lines = csvText.split('\n').filter(line => line.trim());
     if (lines.length < 2) {
         showNotification('CSV file must have at least a header row and one data row', 'error');
@@ -505,17 +527,18 @@ function parseCsvText(csvText) {
             item.valid = true;
         }
 
-        // Check for duplicates by email
-        const existingActive = appState.activeContributors.find(c =>
-            c.email.toLowerCase() === email.toLowerCase()
-        );
-        const existingArchived = appState.archivedContributors.find(c =>
-            c.email.toLowerCase() === email.toLowerCase()
-        );
+        // Check for duplicates considering status
+        const existing = [...appState.activeContributors, ...appState.archivedContributors]
+            .filter(c => c.email.toLowerCase() === email.toLowerCase());
 
-        if (existingActive || existingArchived) {
+        if (existing.some(c => c.status === status)) {
             item.duplicate = true;
             item.error = 'Duplicate email';
+            item.valid = false;
+        } else if ((status === 'passed' && existing.some(c => c.status === 'failed')) ||
+                   (status === 'failed' && existing.some(c => c.status === 'passed'))) {
+            item.duplicate = true;
+            item.error = 'Email already has conflicting status';
             item.valid = false;
         }
 
