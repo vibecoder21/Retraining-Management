@@ -1104,6 +1104,10 @@ select.form-control {
   letter-spacing: 0.025em;
 }
 
+.contributors-table th.sortable {
+  cursor: pointer;
+}
+
 .contributors-table tbody tr:hover {
   background-color: var(--color-bg-2);
 }
@@ -1126,9 +1130,9 @@ select.form-control {
 }
 
 .status-badge--assigned {
-  background-color: var(--color-bg-6);
-  color: var(--color-warning);
-  border: 1px solid rgba(var(--color-warning-rgb), 0.2);
+  background-color: var(--color-gray-200);
+  color: var(--color-gray-400);
+  border: 1px solid var(--color-gray-300);
 }
 
 .status-badge--passed {

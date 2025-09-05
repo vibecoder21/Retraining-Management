@@ -7,7 +7,9 @@ let appState = {
     charts: {},
     bulkErrors: [],
     projectList: [],
-    currentProject: 'Default'
+    currentProject: 'Default',
+    sortField: null,
+    sortDirection: 'asc'
 };
 
 // Initialize with sample data
@@ -932,10 +934,20 @@ function renderActiveContributors(contributors = null) {
         });
     }
     
+    if (appState.sortField) {
+        const dir = appState.sortDirection === 'asc' ? 1 : -1;
+        const field = appState.sortField;
+        filteredContributors = [...filteredContributors].sort((a, b) => {
+            let valA = a[field] || '';
+            let valB = b[field] || '';
+            return String(valA).toLowerCase().localeCompare(String(valB).toLowerCase()) * dir;
+        });
+    }
+
     if (filteredContributors.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="8" class="empty-state">
+                <td colspan="6" class="empty-state">
                     <h3>No contributors found</h3>
                     <p>Try adjusting your search criteria or add new contributors.</p>
                 </td>
@@ -943,7 +955,7 @@ function renderActiveContributors(contributors = null) {
         `;
         return;
     }
-    
+
     tbody.innerHTML = filteredContributors.map(contributor => `
         <tr>
             <td><input type="checkbox" class="contributor-checkbox" data-id="${contributor.id}"></td>
@@ -962,8 +974,6 @@ function renderActiveContributors(contributors = null) {
                 </select>
             </td>
             <td>${formatDate(contributor.dateAdded)}</td>
-            <td>${formatDate(contributor.dateAssigned)}</td>
-            <td>${formatDate(contributor.dateCompleted)}</td>
             <td>
                 <button class="action-btn action-btn--primary" onclick="archiveContributor('${contributor.id}'); renderActiveContributors();">Archive</button>
                 <button class="action-btn action-btn--danger" onclick="confirmRemove('${contributor.id}')">Remove</button>
@@ -988,22 +998,34 @@ function renderActiveContributors(contributors = null) {
 
 function renderDailyView() {
     const selectedDate = document.getElementById('dailyDatePicker').value;
-    if (!selectedDate) return;
-    
-    // Filter contributors by selected date
-    const dailyContributors = appState.activeContributors.filter(c => 
-        c.dateAdded === selectedDate || 
-        c.dateAssigned === selectedDate || 
-        c.dateCompleted === selectedDate
-    );
-    
-    // Calculate daily stats
-    const stats = {
-        totalAdded: appState.activeContributors.filter(c => c.dateAdded === selectedDate).length,
-        assigned: appState.activeContributors.filter(c => c.dateAssigned === selectedDate).length,
-        passed: appState.activeContributors.filter(c => c.dateCompleted === selectedDate && c.result === 'passed').length,
-        failed: appState.activeContributors.filter(c => c.dateCompleted === selectedDate && c.result === 'failed').length
-    };
+
+    let dailyContributors;
+    let stats;
+
+    if (!selectedDate) {
+        dailyContributors = appState.activeContributors;
+        stats = {
+            totalAdded: appState.activeContributors.length,
+            assigned: appState.activeContributors.filter(c => c.status === 'assigned').length,
+            passed: appState.activeContributors.filter(c => c.result === 'passed').length,
+            failed: appState.activeContributors.filter(c => c.result === 'failed').length
+        };
+    } else {
+        // Filter contributors by selected date
+        dailyContributors = appState.activeContributors.filter(c =>
+            c.dateAdded === selectedDate ||
+            c.dateAssigned === selectedDate ||
+            c.dateCompleted === selectedDate
+        );
+
+        // Calculate daily stats
+        stats = {
+            totalAdded: appState.activeContributors.filter(c => c.dateAdded === selectedDate).length,
+            assigned: appState.activeContributors.filter(c => c.dateAssigned === selectedDate).length,
+            passed: appState.activeContributors.filter(c => c.dateCompleted === selectedDate && c.result === 'passed').length,
+            failed: appState.activeContributors.filter(c => c.dateCompleted === selectedDate && c.result === 'failed').length
+        };
+    }
     
     // Update stat cards
     const dailyTotalEl = document.getElementById('dailyTotalAdded');
@@ -1021,25 +1043,24 @@ function renderDailyView() {
     if (!tbody) return;
     
     if (dailyContributors.length === 0) {
+        const message = selectedDate ? `No activity on ${formatDate(selectedDate)}` : 'No contributors found';
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" class="empty-state">
-                    <h3>No activity on ${formatDate(selectedDate)}</h3>
-                    <p>No contributors were added, assigned, or completed on this date.</p>
+                <td colspan="5" class="empty-state">
+                    <h3>${message}</h3>
+                    <p>${selectedDate ? 'No contributors were added, assigned, or completed on this date.' : 'No contributors have been added yet.'}</p>
                 </td>
             </tr>
         `;
         return;
     }
-    
+
     tbody.innerHTML = dailyContributors.map(contributor => `
         <tr>
             <td>${contributor.email}</td>
             <td><span class="status-badge status-badge--${contributor.status}">${contributor.status}</span></td>
             <td><span class="status-badge status-badge--${contributor.result || 'pending'}">${contributor.result || '-'}</span></td>
             <td>${formatDate(contributor.dateAdded)}</td>
-            <td>${formatDate(contributor.dateAssigned)}</td>
-            <td>${formatDate(contributor.dateCompleted)}</td>
             <td>
                 <button class="action-btn action-btn--primary" onclick="archiveContributor('${contributor.id}'); renderDailyView();">Archive</button>
             </td>
@@ -1148,16 +1169,16 @@ function renderCharts() {
             labels: passFailData.labels,
             datasets: [
                 {
-                    label: 'Passed',
-                    data: passFailData.passed,
-                    borderColor: '#B4413C',
-                    backgroundColor: 'rgba(180, 65, 60, 0.1)'
+                    label: 'Pass %',
+                    data: passFailData.passRate,
+                    borderColor: '#21808D',
+                    backgroundColor: 'rgba(33, 128, 141, 0.1)'
                 },
                 {
-                    label: 'Failed',
-                    data: passFailData.failed,
-                    borderColor: '#FFC185',
-                    backgroundColor: 'rgba(255, 193, 133, 0.1)'
+                    label: 'Fail %',
+                    data: passFailData.failRate,
+                    borderColor: '#C0152F',
+                    backgroundColor: 'rgba(192, 21, 47, 0.1)'
                 }
             ]
         },
@@ -1167,8 +1188,9 @@ function renderCharts() {
             scales: {
                 y: {
                     beginAtZero: true,
+                    max: 100,
                     ticks: {
-                        stepSize: 1
+                        callback: value => `${value}%`
                     }
                 }
             }
@@ -1190,7 +1212,7 @@ function renderCharts() {
             labels: ['Pending', 'Assigned', 'Passed', 'Failed'],
             datasets: [{
                 data: [statusData.pending, statusData.assigned, statusData.passed, statusData.failed],
-                backgroundColor: ['#1FB8CD', '#FFC185', '#B4413C', '#ECEBD5']
+                backgroundColor: ['#1FB8CD', '#A7A9A9', '#21808D', '#C0152F']
             }]
         },
         options: {
@@ -1214,14 +1236,19 @@ function renderCharts() {
             labels: weeklyData.labels,
             datasets: [
                 {
-                    label: 'Added',
-                    data: weeklyData.added,
-                    backgroundColor: '#5D878F'
+                    label: 'Assigned',
+                    data: weeklyData.assigned,
+                    backgroundColor: '#A7A9A9'
                 },
                 {
-                    label: 'Completed',
-                    data: weeklyData.completed,
-                    backgroundColor: '#DB4545'
+                    label: 'Passed',
+                    data: weeklyData.passed,
+                    backgroundColor: '#21808D'
+                },
+                {
+                    label: 'Failed',
+                    data: weeklyData.failed,
+                    backgroundColor: '#C0152F'
                 }
             ]
         },
@@ -1265,27 +1292,31 @@ function getDailyAdditionsData() {
 function getPassFailData() {
     const last7Days = [];
     const today = new Date();
-    
+
     for (let i = 6; i >= 0; i--) {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
         last7Days.push(date.toISOString().split('T')[0]);
     }
-    
-    const passed = last7Days.map(date => {
-        return appState.activeContributors.filter(c => c.dateCompleted === date && c.result === 'passed').length +
-               appState.archivedContributors.filter(c => c.dateCompleted === date && c.result === 'passed').length;
+
+    const passRate = [];
+    const failRate = [];
+
+    last7Days.forEach(date => {
+        const assigned = appState.activeContributors.filter(c => c.dateAssigned === date).length +
+                        appState.archivedContributors.filter(c => c.dateAssigned === date).length;
+        const passed = appState.activeContributors.filter(c => c.dateCompleted === date && c.result === 'passed').length +
+                       appState.archivedContributors.filter(c => c.dateCompleted === date && c.result === 'passed').length;
+        const failed = appState.activeContributors.filter(c => c.dateCompleted === date && c.result === 'failed').length +
+                       appState.archivedContributors.filter(c => c.dateCompleted === date && c.result === 'failed').length;
+        passRate.push(assigned ? Number(((passed / assigned) * 100).toFixed(2)) : 0);
+        failRate.push(assigned ? Number(((failed / assigned) * 100).toFixed(2)) : 0);
     });
 
-    const failed = last7Days.map(date => {
-        return appState.activeContributors.filter(c => c.dateCompleted === date && c.result === 'failed').length +
-               appState.archivedContributors.filter(c => c.dateCompleted === date && c.result === 'failed').length;
-    });
-    
     return {
         labels: last7Days.map(date => new Date(date).toLocaleDateString()),
-        passed: passed,
-        failed: failed
+        passRate,
+        failRate
     };
 }
 
@@ -1300,14 +1331,44 @@ function getStatusDistribution() {
 }
 
 function getWeeklySummaryData() {
-    const weeks = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
-    const added = [5, 8, 6, 4];
-    const completed = [3, 6, 5, 3];
-    
+    const weeks = [];
+    const assigned = [];
+    const passed = [];
+    const failed = [];
+    const today = new Date();
+    const startOfCurrentWeek = new Date(today);
+    startOfCurrentWeek.setDate(startOfCurrentWeek.getDate() - startOfCurrentWeek.getDay());
+
+    const isBetween = (dateStr, start, end) => {
+        if (!dateStr) return false;
+        const d = new Date(dateStr);
+        return d >= start && d <= end;
+    };
+
+    for (let i = 3; i >= 0; i--) {
+        const start = new Date(startOfCurrentWeek);
+        start.setDate(start.getDate() - i * 7);
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        weeks.push(start.toLocaleDateString());
+
+        const assignedCount = appState.activeContributors.filter(c => isBetween(c.dateAssigned, start, end)).length +
+                              appState.archivedContributors.filter(c => isBetween(c.dateAssigned, start, end)).length;
+        const passedCount = appState.activeContributors.filter(c => c.result === 'passed' && isBetween(c.dateCompleted, start, end)).length +
+                             appState.archivedContributors.filter(c => c.result === 'passed' && isBetween(c.dateCompleted, start, end)).length;
+        const failedCount = appState.activeContributors.filter(c => c.result === 'failed' && isBetween(c.dateCompleted, start, end)).length +
+                             appState.archivedContributors.filter(c => c.result === 'failed' && isBetween(c.dateCompleted, start, end)).length;
+
+        assigned.push(assignedCount);
+        passed.push(passedCount);
+        failed.push(failedCount);
+    }
+
     return {
         labels: weeks,
-        added: added,
-        completed: completed
+        assigned,
+        passed,
+        failed
     };
 }
 
@@ -1419,11 +1480,23 @@ function initApp() {
 
     renderProjectOptions();
 
-    // Set initial date for daily view
+    // Set up sortable table headers
+    const sortableHeaders = document.querySelectorAll('#active-tab th.sortable');
+    sortableHeaders.forEach(th => {
+        th.addEventListener('click', () => {
+            const field = th.dataset.sort;
+            if (appState.sortField === field) {
+                appState.sortDirection = appState.sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                appState.sortField = field;
+                appState.sortDirection = 'asc';
+            }
+            renderActiveContributors();
+        });
+    });
+
+    // Default daily view to summary (no date selected)
     const dailyDatePicker = document.getElementById('dailyDatePicker');
-    if (dailyDatePicker) {
-        dailyDatePicker.value = getCurrentDate();
-    }
     
     // Set initial date range for statistics
     const today = new Date();
