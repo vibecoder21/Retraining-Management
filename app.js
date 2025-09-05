@@ -294,31 +294,18 @@ function normalizeEmail(email) {
     return `${normalizedLocal}@${domain}`;
 }
 
-function isOutlierEmail(email) {
-    return email.toLowerCase().split('@')[0].endsWith('+outlier');
-}
-
 function dedupeOutlierContributors() {
     const seen = new Map();
     let hasDuplicates = false;
 
     appState.activeContributors.forEach(contributor => {
         const norm = normalizeEmail(contributor.email);
-        const existing = seen.get(norm);
-        if (!existing) {
-            seen.set(norm, contributor);
-            return;
-        }
-
-        const existingOutlier = isOutlierEmail(existing.email);
-        const currentOutlier = isOutlierEmail(contributor.email);
-        if (currentOutlier && !existingOutlier) {
-            existing.duplicate = true;
-            seen.set(norm, contributor);
-        } else {
+        if (seen.has(norm)) {
             contributor.duplicate = true;
+            hasDuplicates = true;
+        } else {
+            seen.set(norm, contributor);
         }
-        hasDuplicates = true;
     });
 
     if (hasDuplicates) {
@@ -464,19 +451,9 @@ function addContributor(email, status = 'pending') {
             existing.result = status;
             existing.status = 'assigned';
             existing.dateCompleted = getCurrentDate();
-            if (!isOutlierEmail(existing.email) && isOutlierEmail(email)) {
-                existing.email = email;
-            }
             saveState();
             return { success: true, contributor: existing };
         }
-
-        if (!isOutlierEmail(existing.email) && isOutlierEmail(email)) {
-            existing.email = email;
-            saveState();
-            return { success: true, contributor: existing };
-        }
-
         return { success: false, error: 'Contributor with this email already exists' };
     }
 
@@ -613,47 +590,24 @@ function parseBulkText(text, status = 'assigned') {
             .find(c => normalizeEmail(c.email) === norm);
 
         if (existing) {
-            const existingOutlier = isOutlierEmail(existing.email);
-            const newOutlier = isOutlierEmail(email);
-            if (existingOutlier && !newOutlier) {
+            if (status === 'passed' || status === 'failed') {
+                if (existing.result && existing.result !== status) {
+                    item.duplicate = true;
+                    item.error = 'Email already has conflicting result';
+                    item.valid = false;
+                }
+            } else {
                 item.duplicate = true;
                 item.error = 'Duplicate email';
                 item.valid = false;
-            } else if (!existingOutlier && newOutlier) {
-                if (status === 'passed' || status === 'failed') {
-                    if (existing.result && existing.result !== status) {
-                        item.duplicate = true;
-                        item.error = 'Email already has conflicting result';
-                        item.valid = false;
-                    }
-                }
-            } else {
-                if (status === 'passed' || status === 'failed') {
-                    if (existing.result && existing.result !== status) {
-                        item.duplicate = true;
-                        item.error = 'Email already has conflicting result';
-                        item.valid = false;
-                    }
-                } else {
-                    item.duplicate = true;
-                    item.error = 'Duplicate email';
-                    item.valid = false;
-                }
             }
         }
 
         const prev = seen[norm];
         if (prev) {
-            if (isOutlierEmail(email) && !isOutlierEmail(prev.email)) {
-                prev.duplicate = true;
-                prev.valid = false;
-                prev.error = 'Duplicate email';
-                seen[norm] = item;
-            } else {
-                item.duplicate = true;
-                item.valid = false;
-                item.error = 'Duplicate email';
-            }
+            item.duplicate = true;
+            item.valid = false;
+            item.error = 'Duplicate email';
         } else {
             seen[norm] = item;
         }
@@ -842,47 +796,24 @@ function parseCsvText(csvText, status = 'pending') {
             .find(c => normalizeEmail(c.email) === norm);
 
         if (existing) {
-            const existingOutlier = isOutlierEmail(existing.email);
-            const newOutlier = isOutlierEmail(email);
-            if (existingOutlier && !newOutlier) {
+            if (status === 'passed' || status === 'failed') {
+                if (existing.result && existing.result !== status) {
+                    item.duplicate = true;
+                    item.error = 'Email already has conflicting result';
+                    item.valid = false;
+                }
+            } else {
                 item.duplicate = true;
                 item.error = 'Duplicate email';
                 item.valid = false;
-            } else if (!existingOutlier && newOutlier) {
-                if (status === 'passed' || status === 'failed') {
-                    if (existing.result && existing.result !== status) {
-                        item.duplicate = true;
-                        item.error = 'Email already has conflicting result';
-                        item.valid = false;
-                    }
-                }
-            } else {
-                if (status === 'passed' || status === 'failed') {
-                    if (existing.result && existing.result !== status) {
-                        item.duplicate = true;
-                        item.error = 'Email already has conflicting result';
-                        item.valid = false;
-                    }
-                } else {
-                    item.duplicate = true;
-                    item.error = 'Duplicate email';
-                    item.valid = false;
-                }
             }
         }
 
         const prev = seen[norm];
         if (prev) {
-            if (isOutlierEmail(email) && !isOutlierEmail(prev.email)) {
-                prev.duplicate = true;
-                prev.valid = false;
-                prev.error = 'Duplicate email';
-                seen[norm] = item;
-            } else {
-                item.duplicate = true;
-                item.valid = false;
-                item.error = 'Duplicate email';
-            }
+            item.duplicate = true;
+            item.valid = false;
+            item.error = 'Duplicate email';
         } else {
             seen[norm] = item;
         }
