@@ -392,8 +392,8 @@ function switchMainTab(tabName) {
             case 'active':
                 renderActiveContributors();
                 break;
-            case 'daily':
-                renderDailyView();
+            case 'summary':
+                renderSummary();
                 break;
             case 'archive':
                 renderArchive();
@@ -475,6 +475,8 @@ function updateContributorStatus(contributorId, type, newStatus) {
         showNotification(`Result status updated to ${newStatus || 'none'}`);
     }
     saveState();
+    renderSummary();
+    renderCharts();
 }
 
 function archiveContributor(contributorId) {
@@ -489,6 +491,8 @@ function archiveContributor(contributorId) {
 
     saveState();
     showNotification('Contributor archived successfully!');
+    renderSummary();
+    renderCharts();
 }
 
 function restoreContributor(contributorId) {
@@ -502,6 +506,8 @@ function restoreContributor(contributorId) {
     appState.archivedContributors.splice(contributorIndex, 1);
     saveState();
     showNotification('Contributor restored to active list!');
+    renderSummary();
+    renderCharts();
 }
 
 function removeContributor(contributorId) {
@@ -510,6 +516,8 @@ function removeContributor(contributorId) {
         appState.activeContributors.splice(activeIndex, 1);
         saveState();
         showNotification('Contributor removed!');
+        renderSummary();
+        renderCharts();
         return;
     }
 
@@ -518,6 +526,8 @@ function removeContributor(contributorId) {
         appState.archivedContributors.splice(archivedIndex, 1);
         saveState();
         showNotification('Contributor removed!');
+        renderSummary();
+        renderCharts();
     }
 }
 
@@ -944,6 +954,14 @@ function renderActiveContributors(contributors = null) {
         });
     }
 
+    // Update sort indicators
+    document.querySelectorAll('#active-tab th.sortable').forEach(th => {
+        th.classList.remove('sorted-asc', 'sorted-desc');
+        if (appState.sortField === th.dataset.sort) {
+            th.classList.add(appState.sortDirection === 'asc' ? 'sorted-asc' : 'sorted-desc');
+        }
+    });
+
     if (filteredContributors.length === 0) {
         tbody.innerHTML = `
             <tr>
@@ -961,13 +979,13 @@ function renderActiveContributors(contributors = null) {
             <td><input type="checkbox" class="contributor-checkbox" data-id="${contributor.id}"></td>
             <td>${contributor.email}</td>
             <td>
-                <select class="assignment-select" data-id="${contributor.id}">
+                <select class="assignment-select status-select status-select--${contributor.status}" data-id="${contributor.id}">
                     <option value="pending" ${contributor.status === 'pending' ? 'selected' : ''}>Pending</option>
                     <option value="assigned" ${contributor.status === 'assigned' ? 'selected' : ''}>Assigned</option>
                 </select>
             </td>
             <td>
-                <select class="result-select" data-id="${contributor.id}">
+                <select class="result-select status-select status-select--${contributor.result || 'pending'}" data-id="${contributor.id}">
                     <option value="" ${!contributor.result ? 'selected' : ''}>-</option>
                     <option value="passed" ${contributor.result === 'passed' ? 'selected' : ''}>Passed</option>
                     <option value="failed" ${contributor.result === 'failed' ? 'selected' : ''}>Failed</option>
@@ -996,74 +1014,49 @@ function renderActiveContributors(contributors = null) {
     });
 }
 
-function renderDailyView() {
-    const selectedDate = document.getElementById('dailyDatePicker').value;
+function renderSummary() {
+    const allContributors = [...appState.activeContributors, ...appState.archivedContributors];
 
-    let dailyContributors;
-    let stats;
+    const stats = {
+        totalAdded: allContributors.length,
+        assigned: allContributors.filter(c => c.status === 'assigned').length,
+        passed: allContributors.filter(c => c.result === 'passed').length,
+        failed: allContributors.filter(c => c.result === 'failed').length
+    };
 
-    if (!selectedDate) {
-        dailyContributors = appState.activeContributors;
-        stats = {
-            totalAdded: appState.activeContributors.length,
-            assigned: appState.activeContributors.filter(c => c.status === 'assigned').length,
-            passed: appState.activeContributors.filter(c => c.result === 'passed').length,
-            failed: appState.activeContributors.filter(c => c.result === 'failed').length
-        };
-    } else {
-        // Filter contributors by selected date
-        dailyContributors = appState.activeContributors.filter(c =>
-            c.dateAdded === selectedDate ||
-            c.dateAssigned === selectedDate ||
-            c.dateCompleted === selectedDate
-        );
-
-        // Calculate daily stats
-        stats = {
-            totalAdded: appState.activeContributors.filter(c => c.dateAdded === selectedDate).length,
-            assigned: appState.activeContributors.filter(c => c.dateAssigned === selectedDate).length,
-            passed: appState.activeContributors.filter(c => c.dateCompleted === selectedDate && c.result === 'passed').length,
-            failed: appState.activeContributors.filter(c => c.dateCompleted === selectedDate && c.result === 'failed').length
-        };
-    }
-    
     // Update stat cards
-    const dailyTotalEl = document.getElementById('dailyTotalAdded');
-    const dailyAssignedEl = document.getElementById('dailyAssigned');
-    const dailyPassedEl = document.getElementById('dailyPassed');
-    const dailyFailedEl = document.getElementById('dailyFailed');
-    
-    if (dailyTotalEl) dailyTotalEl.textContent = stats.totalAdded;
-    if (dailyAssignedEl) dailyAssignedEl.textContent = stats.assigned;
-    if (dailyPassedEl) dailyPassedEl.textContent = stats.passed;
-    if (dailyFailedEl) dailyFailedEl.textContent = stats.failed;
-    
-    // Render daily table
-    const tbody = document.getElementById('dailyTableBody');
+    const totalEl = document.getElementById('summaryTotalAdded');
+    const assignedEl = document.getElementById('summaryAssigned');
+    const passedEl = document.getElementById('summaryPassed');
+    const failedEl = document.getElementById('summaryFailed');
+
+    if (totalEl) totalEl.textContent = stats.totalAdded;
+    if (assignedEl) assignedEl.textContent = stats.assigned;
+    if (passedEl) passedEl.textContent = stats.passed;
+    if (failedEl) failedEl.textContent = stats.failed;
+
+    // Render summary table
+    const tbody = document.getElementById('summaryTableBody');
     if (!tbody) return;
-    
-    if (dailyContributors.length === 0) {
-        const message = selectedDate ? `No activity on ${formatDate(selectedDate)}` : 'No contributors found';
+
+    if (allContributors.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="5" class="empty-state">
-                    <h3>${message}</h3>
-                    <p>${selectedDate ? 'No contributors were added, assigned, or completed on this date.' : 'No contributors have been added yet.'}</p>
+                <td colspan="4" class="empty-state">
+                    <h3>No contributors found</h3>
+                    <p>No contributors have been added yet.</p>
                 </td>
             </tr>
         `;
         return;
     }
 
-    tbody.innerHTML = dailyContributors.map(contributor => `
+    tbody.innerHTML = allContributors.map(contributor => `
         <tr>
             <td>${contributor.email}</td>
             <td><span class="status-badge status-badge--${contributor.status}">${contributor.status}</span></td>
             <td><span class="status-badge status-badge--${contributor.result || 'pending'}">${contributor.result || '-'}</span></td>
             <td>${formatDate(contributor.dateAdded)}</td>
-            <td>
-                <button class="action-btn action-btn--primary" onclick="archiveContributor('${contributor.id}'); renderDailyView();">Archive</button>
-            </td>
         </tr>
     `).join('');
 }
@@ -1324,7 +1317,7 @@ function getStatusDistribution() {
     const all = [...appState.activeContributors, ...appState.archivedContributors];
     return {
         pending: all.filter(c => c.status === 'pending').length,
-        assigned: all.filter(c => c.status === 'assigned' && !c.result).length,
+        assigned: all.filter(c => c.status === 'assigned').length,
         passed: all.filter(c => c.result === 'passed').length,
         failed: all.filter(c => c.result === 'failed').length
     };
@@ -1495,8 +1488,6 @@ function initApp() {
         });
     });
 
-    // Default daily view to summary (no date selected)
-    const dailyDatePicker = document.getElementById('dailyDatePicker');
     
     // Set initial date range for statistics
     const today = new Date();
@@ -1634,7 +1625,6 @@ function initApp() {
     const statusFilter = document.getElementById('statusFilter');
     const archiveSearchInput = document.getElementById('archiveSearchInput');
     const archiveStatusFilter = document.getElementById('archiveStatusFilter');
-    const dailyDatePickerListener = document.getElementById('dailyDatePicker');
     
     if (searchInput) {
         searchInput.addEventListener('input', () => renderActiveContributors());
@@ -1647,9 +1637,6 @@ function initApp() {
     }
     if (archiveStatusFilter) {
         archiveStatusFilter.addEventListener('change', () => renderArchive());
-    }
-    if (dailyDatePickerListener) {
-        dailyDatePickerListener.addEventListener('change', () => renderDailyView());
     }
     
     // Bulk actions
