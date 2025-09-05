@@ -1106,6 +1106,24 @@ select.form-control {
 
 .contributors-table th.sortable {
   cursor: pointer;
+  position: relative;
+}
+
+.contributors-table th.sortable::after {
+  content: '\2195';
+  margin-left: var(--space-4);
+  font-size: 0.8em;
+  color: var(--color-gray-400);
+}
+
+.contributors-table th.sorted-asc::after {
+  content: '\2191';
+  color: var(--color-primary);
+}
+
+.contributors-table th.sorted-desc::after {
+  content: '\2193';
+  color: var(--color-primary);
 }
 
 .contributors-table tbody tr:hover {
@@ -1156,6 +1174,30 @@ select.form-control {
   color: var(--color-text);
 }
 
+.status-select--pending {
+  background-color: var(--color-bg-1);
+  color: var(--color-primary);
+  border: 1px solid rgba(var(--color-teal-500-rgb), 0.2);
+}
+
+.status-select--assigned {
+  background-color: var(--color-gray-200);
+  color: var(--color-gray-400);
+  border: 1px solid var(--color-gray-300);
+}
+
+.status-select--passed {
+  background-color: var(--color-bg-3);
+  color: var(--color-success);
+  border: 1px solid rgba(var(--color-success-rgb), 0.2);
+}
+
+.status-select--failed {
+  background-color: var(--color-bg-4);
+  color: var(--color-error);
+  border: 1px solid rgba(var(--color-error-rgb), 0.2);
+}
+
 .action-btn {
   padding: var(--space-4) var(--space-8);
   margin: 0 var(--space-2);
@@ -1190,15 +1232,7 @@ select.form-control {
   background-color: rgba(var(--color-teal-500-rgb), 0.1);
 }
 
-.daily-controls {
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-20);
-  margin-bottom: var(--space-24);
-}
-
-.daily-stats {
+.summary-stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--space-16);
@@ -1401,7 +1435,7 @@ select.form-control {
     grid-template-columns: 1fr;
   }
 
-  .daily-stats {
+  .summary-stats {
     grid-template-columns: repeat(2, 1fr);
   }
 
@@ -1426,7 +1460,7 @@ select.form-control {
 }
 
 @media (max-width: 480px) {
-  .daily-stats {
+  .summary-stats {
     grid-template-columns: 1fr;
   }
 

@@ -30,7 +30,7 @@
         <nav class="nav-tabs">
             <div class="container">
                 <button class="tab-btn active" data-tab="active">Active Contributors</button>
-                <button class="tab-btn" data-tab="daily">Daily View</button>
+                <button class="tab-btn" data-tab="summary">Summary</button>
                 <button class="tab-btn" data-tab="statistics">Statistics</button>
                 <button class="tab-btn" data-tab="archive">Archive</button>
             </div>
@@ -191,32 +191,26 @@
                     </div>
                 </div>
 
-                <!-- Daily View Tab -->
-                <div id="daily-tab" class="tab-content">
+                <!-- Summary Tab -->
+                <div id="summary-tab" class="tab-content">
                     <div class="section">
-                        <h2>Daily View</h2>
-                        <div class="daily-controls">
-                            <div class="form-group">
-                                <label class="form-label" for="dailyDatePicker">Select Date</label>
-                                <input type="date" id="dailyDatePicker" class="form-control">
-                            </div>
-                        </div>
-                        
-                        <div class="daily-stats">
+                        <h2>Summary</h2>
+
+                        <div class="summary-stats">
                             <div class="stat-card">
-                                <div class="stat-value" id="dailyTotalAdded">0</div>
+                                <div class="stat-value" id="summaryTotalAdded">0</div>
                                 <div class="stat-label">Total Added</div>
                             </div>
                             <div class="stat-card">
-                                <div class="stat-value" id="dailyAssigned">0</div>
+                                <div class="stat-value" id="summaryAssigned">0</div>
                                 <div class="stat-label">Assigned</div>
                             </div>
                             <div class="stat-card">
-                                <div class="stat-value" id="dailyPassed">0</div>
+                                <div class="stat-value" id="summaryPassed">0</div>
                                 <div class="stat-label">Passed</div>
                             </div>
                             <div class="stat-card">
-                                <div class="stat-value" id="dailyFailed">0</div>
+                                <div class="stat-value" id="summaryFailed">0</div>
                                 <div class="stat-label">Failed</div>
                             </div>
                         </div>
@@ -229,10 +223,9 @@
                                         <th>Assignment</th>
                                         <th>Result</th>
                                         <th>Date Added</th>
-                                        <th>Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody id="dailyTableBody">
+                                <tbody id="summaryTableBody">
                                     <!-- Table rows will be populated by JavaScript -->
                                 </tbody>
                             </table>
