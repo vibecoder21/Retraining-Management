@@ -1110,19 +1110,19 @@ select.form-control {
 }
 
 .contributors-table th.sortable::after {
-  content: '\2195';
+  content: '↕';
   margin-left: var(--space-4);
   font-size: 0.8em;
   color: var(--color-gray-400);
 }
 
 .contributors-table th.sorted-asc::after {
-  content: '\2191';
+  content: '↑';
   color: var(--color-primary);
 }
 
 .contributors-table th.sorted-desc::after {
-  content: '\2193';
+  content: '↓';
   color: var(--color-primary);
 }
 
@@ -1154,15 +1154,15 @@ select.form-control {
 }
 
 .status-badge--passed {
-  background-color: var(--color-bg-3);
-  color: var(--color-success);
-  border: 1px solid rgba(var(--color-success-rgb), 0.2);
+  background-color: #d1fae5;
+  color: #166534;
+  border: 1px solid #34d399;
 }
 
 .status-badge--failed {
-  background-color: var(--color-bg-4);
-  color: var(--color-error);
-  border: 1px solid rgba(var(--color-error-rgb), 0.2);
+  background-color: #fecaca;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
 }
 
 .status-select {
@@ -1175,27 +1175,27 @@ select.form-control {
 }
 
 .status-select--pending {
-  background-color: var(--color-bg-1);
-  color: var(--color-primary);
-  border: 1px solid rgba(var(--color-teal-500-rgb), 0.2);
+  background-color: transparent;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
 }
 
 .status-select--assigned {
   background-color: var(--color-gray-200);
-  color: var(--color-gray-400);
+  color: var(--color-text);
   border: 1px solid var(--color-gray-300);
 }
 
 .status-select--passed {
-  background-color: var(--color-bg-3);
-  color: var(--color-success);
-  border: 1px solid rgba(var(--color-success-rgb), 0.2);
+  background-color: #d1fae5;
+  color: #166534;
+  border: 1px solid #34d399;
 }
 
 .status-select--failed {
-  background-color: var(--color-bg-4);
-  color: var(--color-error);
-  border: 1px solid rgba(var(--color-error-rgb), 0.2);
+  background-color: #fecaca;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
 }
 
 .action-btn {
