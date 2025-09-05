@@ -1391,10 +1391,13 @@ function initApp() {
     if (shared) {
         try {
             const data = decodeProjectData(shared);
-            let name = data.name || 'Shared Project';
-            if (appState.projectList.includes(name)) {
-                // If the project already exists, switch to it instead of creating a duplicate
-                appState.currentProject = name;
+            let name = (data.name || 'Shared Project').trim();
+            const existing = appState.projectList.find(
+                p => p.trim().toLowerCase() === name.toLowerCase()
+            );
+            if (existing) {
+                // Project already exists; switch to it instead of creating a copy
+                appState.currentProject = existing;
             } else {
                 appState.projectList.push(name);
                 appState.currentProject = name;
@@ -1606,11 +1609,8 @@ function initApp() {
     // Project controls
     const projectSelect = document.getElementById('projectSelect');
     const addProjectBtn = document.getElementById('addProjectBtn');
-    const exportProjectBtn = document.getElementById('exportProjectBtn');
-    const importProjectBtn = document.getElementById('importProjectBtn');
     const shareProjectBtn = document.getElementById('shareProjectBtn');
     const deleteProjectBtn = document.getElementById('deleteProjectBtn');
-    const importProjectFile = document.getElementById('importProjectFile');
 
     if (projectSelect) {
         projectSelect.addEventListener('change', (e) => {
@@ -1642,21 +1642,12 @@ function initApp() {
         });
     }
 
-    if (exportProjectBtn) {
-        exportProjectBtn.addEventListener('click', exportProject);
-    }
-
     if (shareProjectBtn) {
         shareProjectBtn.addEventListener('click', shareProject);
     }
 
     if (deleteProjectBtn) {
         deleteProjectBtn.addEventListener('click', deleteProject);
-    }
-
-    if (importProjectBtn && importProjectFile) {
-        importProjectBtn.addEventListener('click', () => importProjectFile.click());
-        importProjectFile.addEventListener('change', handleImportProject);
     }
     
     // Modal event listeners
