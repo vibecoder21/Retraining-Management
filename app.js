@@ -1393,13 +1393,12 @@ function initApp() {
             const data = decodeProjectData(shared);
             let name = data.name || 'Shared Project';
             if (appState.projectList.includes(name)) {
-                let suffix = 1;
-                const base = name;
-                while (appState.projectList.includes(`${base} (${suffix})`)) suffix++;
-                name = `${base} (${suffix})`;
+                // If the project already exists, switch to it instead of creating a duplicate
+                appState.currentProject = name;
+            } else {
+                appState.projectList.push(name);
+                appState.currentProject = name;
             }
-            appState.projectList.push(name);
-            appState.currentProject = name;
             appState.activeContributors = data.activeContributors || [];
             appState.archivedContributors = data.archivedContributors || [];
             saveState();
