@@ -289,9 +289,10 @@ function validateEmail(email) {
 }
 
 function normalizeEmail(email) {
-    const [local, domain] = email.toLowerCase().split('@');
+    const [local, domain = ''] = email.toLowerCase().split('@');
     const normalizedLocal = local.replace(/\+outlier$/i, '');
-    return `${normalizedLocal}@${domain}`;
+    const normalizedDomain = domain.replace(/\+outlier$/i, '');
+    return `${normalizedLocal}@${normalizedDomain}`;
 }
 
 function dedupeOutlierContributors() {
